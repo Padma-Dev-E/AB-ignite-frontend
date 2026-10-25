@@ -29,6 +29,7 @@ import type {
   AdminAuditEvent,
 } from "../types";
 import { AdminDrawer, AdminPagination } from "./admin-data-ui";
+import { BrandLoading } from "../../../components/ui/brand-loading";
 
 type AdminWorkspaceProps = { email: string };
 type SubnavItem = { id: string; label: string };
@@ -328,7 +329,7 @@ function SettingsPanel() {
 export function AdminWorkspace({ email }: AdminWorkspaceProps) {
   const { data: session, status } = useSession();
   const [requestedView, setRequestedView] = useState<AdminView>("dashboard");
-  if (status === "loading") return <main className="min-h-screen bg-[#f8faff] p-6" role="status" aria-busy="true">Loading back office…</main>;
+  if (status === "loading") return <BrandLoading label="AB Ignite is checking your workspace" detail="Loading your secure back-office session…" />;
   if (!session?.user) return <main className="min-h-screen bg-[#f8faff] p-6" role="alert">Your session has ended. Sign in to open the back office.</main>;
   const role = session.user.role;
   const views = visibleAdminViews(role);

@@ -11,8 +11,8 @@ export function PortalBrand({ className = "" }: { className?: string }) {
   </div>;
 }
 
-export const portalSidebarClass = "fixed inset-y-0 left-0 z-50 flex w-[225px] -translate-x-[105%] flex-col gap-6 border-r bg-[var(--bg)] p-[22px_14px] transition-transform lg:sticky lg:top-0 lg:h-screen lg:w-[225px] lg:translate-x-0 lg:bg-[var(--bg)]";
-export const portalNavigationClass = "flex flex-col gap-0.5";
+export const portalSidebarClass = "fixed inset-y-0 left-0 z-50 flex w-[225px] -translate-x-[105%] flex-col gap-6 overflow-y-auto overscroll-contain border-r bg-[var(--bg)] p-[22px_14px] transition-transform lg:sticky lg:top-0 lg:h-screen lg:w-[225px] lg:translate-x-0 lg:bg-[var(--bg)]";
+export const portalNavigationClass = "flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain";
 export const portalNavigationItemClass = "relative flex items-center gap-3 rounded-[10px] px-3 py-3 text-left font-normal transition";
 export const portalHeaderClass = "sticky top-0 z-30 flex h-[61px] min-h-[61px] items-center gap-2 border-b bg-white/75 px-3 py-2 backdrop-blur-md sm:px-7";
 

@@ -53,7 +53,37 @@ export type IdeaPriorityPolicy = {
 export type IdeaSubmitResponse = { ideaId: number; versionId: number; runId?: number | null; status: string; submitted?: boolean; reference?: string; minimumScore?: number; confirmation?: string; score?: number; priorityBand?: "Watch" | "Quality" | "Priority"; category?: string; breakdown?: IdeaPriorityBreakdown[]; pointsAwarded?: number; aiValidationScore?: number | null; aiValidationAttempts?: number; submittedWithLowAiScore?: boolean };
 export type IdeaAiStatusResponse = { idea: Pick<Idea, "id" | "status" | "reference">; runs: Array<{ id: number; jobKey: string; status: string; attemptCount: number; createdAt: string; updatedAt: string; completedAt: string | null }>; events: Array<{ id: number; eventType: string; createdAt: string }>; reviews: unknown[] };
 export type IdeaEnrichment = { suggestedTitle: string; conciseSummary: string; problemStatement: string; solutionStatement?: string; riskStatement?: string; valueStatement: string; tags: string[]; taxonomy: string[]; affectedTeams: string[]; assumptions: string[] };
-export type IdeaValidation = { decision: string; confidence: number; overallScore: number; strengths: string[]; gaps: string[]; assumptions: string[]; questions: Array<{ question: string; reason: string }>; risks: Array<{ severity: string; description: string }>; nextActions: Array<{ action: string; ownerRole: string }> };
+export type IdeaValidationScore = { score: number; rationale: string };
+export type IdeaValidationEvaluation = {
+  turnaroundTime: IdeaValidationScore;
+  volume: IdeaValidationScore;
+  savingsRevenue: IdeaValidationScore;
+};
+export type IdeaValidation = {
+  decision: string;
+  confidence: number;
+  overallScore: number;
+  scores?: {
+    novelty: IdeaValidationScore;
+    problemClarity: IdeaValidationScore;
+    customerImpact: IdeaValidationScore;
+    employeeImpact: IdeaValidationScore;
+    strategicAlignment: IdeaValidationScore;
+    feasibility: IdeaValidationScore;
+    value: IdeaValidationScore;
+    risk: IdeaValidationScore;
+    urgency: IdeaValidationScore;
+    scalability: IdeaValidationScore;
+  };
+  evaluation?: IdeaValidationEvaluation;
+  strengths: string[];
+  gaps: string[];
+  assumptions: string[];
+  questions: Array<{ question: string; reason: string }>;
+  risks: Array<{ severity: string; description: string }>;
+  nextActions: Array<{ action: string; ownerRole: string }>;
+  auditSummary?: string;
+};
 export type IdeaClarifyingQuestion = { id: string; question: string; reason: string; required: boolean; answerType: "text" | "number" | "boolean" | "date" | "choice" };
 export type IdeaQuestions = { completeness: number; questions: IdeaClarifyingQuestion[] };
 export type IdeaDevelopmentRun = { id: number; jobKey: "idea.enrich" | "idea.questions" | "idea.validate"; status: string; ideaVersionId: number; result: IdeaEnrichment | IdeaQuestions | IdeaValidation | null; createdAt: string; completedAt: string | null };

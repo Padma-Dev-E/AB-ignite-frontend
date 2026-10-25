@@ -550,6 +550,25 @@ function IdeaStepBar({ step }: { step: number }) {
   );
 }
 
+const validationLenses = [
+  { key: "turnaroundTime", label: "Turnaround time", weight: 0.3 },
+  { key: "volume", label: "Volume", weight: 0.3 },
+  { key: "savingsRevenue", label: "Expected savings or revenue", weight: 0.4 },
+ ] as const;
+
+function getValidationBreakdown(validation: IdeaValidation) {
+  if (!validation.evaluation) return null;
+  const rows = validationLenses.map((lens) => ({ ...lens, ...validation.evaluation![lens.key as keyof NonNullable<IdeaValidation["evaluation"]>] }));
+  const total = rows.reduce((sum, row) => sum + row.score * row.weight, 0);
+  return { rows, total };
+}
+
+function scoreBand(score: number) {
+  if (score >= 2.4) return "Strong";
+  if (score >= 1.5) return "Qualify";
+  return "Watch";
+}
+
 export function EmployeeIdeaSubmissionPage({
   onOpenIdea,
 }: {
@@ -662,6 +681,7 @@ export function EmployeeIdeaSubmissionPage({
   const reviewerQuestions: IdeaClarifyingQuestion[] = generatedQuestionData?.questions ?? [];
   const validationScore = normalizeIdeaValidationScore(validation?.overallScore);
   const validationPassed = ideaValidationPasses(validation);
+  const validationBreakdown = validation ? getValidationBreakdown(validation) : null;
   const lowValidationRuns = allIdeaRuns.filter((run) => {
     if (run.jobKey !== "idea.validate" || run.status !== "succeeded" || run.ideaVersionId <= 0) return false;
     const result = run.result as IdeaValidation | null;
@@ -749,7 +769,20 @@ export function EmployeeIdeaSubmissionPage({
     }
     setCreated({ idea, versionId: 0 });
     setAppliedRunId(null);
-    setValidatedContent(null);
+    const restoredContent = JSON.stringify({
+      kind: idea.kind,
+      raw: idea.summary,
+      title: idea.title,
+      summary: idea.summary,
+      details: {
+        problem: idea.problem ?? "",
+        solution: idea.solution ?? "",
+        benefits: idea.benefits ?? "",
+        risks: idea.risks ?? "",
+      },
+    });
+    validationSnapshot.current = restoredContent;
+    setValidatedContent(restoredContent);
     setResumeDraftId(null);
     dispatch(setIdeaWizardStep(2));
   }, [dispatch, resumeDraftId, resumeDraftQuery.data]);
@@ -867,11 +900,13 @@ export function EmployeeIdeaSubmissionPage({
     setDevelopmentError(null);
     setAiAction(action);
     try {
+      const draft = await syncDraft();
       if (action === "validate") {
+        // Snapshot the exact content after the save has produced its version.
+        // This keeps the result tied to the version the API actually validates.
         validationSnapshot.current = currentContent;
         setValidatedContent(null);
       }
-      const draft = await syncDraft();
       if (action === "questions") setQuestionVersionId(draft.versionId);
       await developmentMutation.mutateAsync({ id: draft.idea.id, action });
       return draft;
@@ -1169,15 +1204,11 @@ export function EmployeeIdeaSubmissionPage({
     );
   }
   return (
-    <div className="stack mx-auto -mt-0.5 w-full max-w-[922px] gap-[25px] lg:translate-x-[7px]">
+    <div className="stack mx-auto mt-[-2px] w-full max-w-[922px] gap-[25px] lg:translate-x-[7px]">
       {step === 1 && <section className="hero-surface relative overflow-hidden rounded-[24px] px-5 py-6 text-white sm:px-7 sm:py-6">
         <div className="relative z-10 max-w-[62%]">
-          <h1 className="text-[25px] font-medium leading-tight tracking-[-.02em] sm:text-[32px]">
-            Share an idea ✨
-          </h1>
-          <p className="mt-1.5 text-sm leading-6 text-white/85 sm:text-[15px]">
-            One sentence is enough. AI checks it is original, develops it with you and validates it against the bank’s criteria.
-          </p>
+          <h1 className="text-[25px] font-medium leading-tight tracking-[-.02em] sm:text-[32px]">Share an idea ✨</h1>
+          <p className="mt-1.5 text-sm leading-6 text-white/85 sm:text-[15px]">One sentence is enough. AI checks it is original, develops it with you and validates it against the bank’s criteria.</p>
         </div>
       </section>}
       <IdeaStepBar step={step} />
@@ -1185,7 +1216,7 @@ export function EmployeeIdeaSubmissionPage({
         <div className="flex flex-wrap items-start gap-2 rounded-xl border px-4 py-[11px] text-[13px]" style={{ borderColor: "var(--line)" }} role="status">
           <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-[#0e9f7a]" />
           <div className="min-w-0 flex-1">
-            {candidateQuery.isPending ? <span className="text-muted">Checking whether this idea is already registered…</span> : candidateQuery.isError ? <span className="text-[#d6336c]">Originality check is temporarily unavailable. Retry the check before submitting.</span> : (candidateQuery.data?.items.length ?? 0) === 0 ? <><b className="text-[#0e9f7a]">Originality check passed.</b> <span className="text-muted">No registered idea matches yours.</span></> : <><b className="text-sand">Related ideas found.</b> <span className="text-muted">Your idea can still proceed; review any related work below.</span> <span className="mt-1 block truncate text-blue">{candidateQuery.data?.items.slice(0, 3).map((item) => item.title).join(" · ")}</span></>}
+            {candidateQuery.isPending ? <span className="text-muted">Checking whether this idea is already registered…</span> : candidateQuery.isError ? <span className="text-[#d6336c]">Originality check is temporarily unavailable. Retry the check before submitting.</span> : (candidateQuery.data?.items.length ?? 0) === 0 ? <><b className="text-[#0e9f7a]">Originality check passed.</b> <span className="text-muted">No registered idea matches yours.</span></> : <><b className="text-sand">Related ideas found.</b> <span className="text-muted">Your idea can still proceed. Related ideas you could learn from: </span><span className="inline-flex flex-wrap gap-x-1">{candidateQuery.data?.items.slice(0, 3).map((item, index) => <span key={item.id}>{index > 0 && <span className="text-muted"> · </span>}<button type="button" className="text-blue underline underline-offset-2" onClick={() => onOpenIdea(item.id)}>{item.title}</button></span>)}</span></>}
           </div>
         </div>
       )}
@@ -1235,7 +1266,7 @@ export function EmployeeIdeaSubmissionPage({
               />
             </label>
             <label className="block sm:col-span-2">
-              <span className="field-label">Summary</span>
+              <span className="field-label">In one or two sentences</span>
               <textarea
                 className="input min-h-[72px]"
                 value={summary}
@@ -1338,28 +1369,22 @@ export function EmployeeIdeaSubmissionPage({
           </div>
           {reviewerQuestions.length > 0 ? (
             <div className="mt-4 space-y-3">
-              <div className="rounded-xl border p-3 text-sm" style={{ borderColor: "var(--line)" }}>
-                <b>{reviewerQuestions.length} AI-generated question{reviewerQuestions.length === 1 ? "" : "s"}</b>
-                {generatedQuestionData && <span className="ml-2 text-muted">Draft completeness: {Math.round(generatedQuestionData.completeness <= 1 ? generatedQuestionData.completeness * 100 : generatedQuestionData.completeness)}%</span>}
-              </div>
               {reviewerQuestions.map((item, index) => {
                 const key = item.question;
                 const value = questionAnswers[key] ?? "";
                 return (
-                  <label key={item.id} className="block rounded-xl border-l-2 px-3 py-1" style={{ borderColor: "var(--line-strong)" }}>
-                    <span className="font-medium">{index + 1}. {item.question}</span>
-                    <span className="ml-2 text-xs text-muted">{item.required ? "Required" : "Optional"} · {item.answerType === "choice" ? "Choice response" : item.answerType}</span>
-                    {item.reason && <span className="mt-1 block text-sm text-muted">Why this matters: {item.reason}</span>}
+                  <label key={item.id} className="block border-l-2 py-1 pl-3 sm:pl-3.5" style={{ borderColor: "var(--line-strong)" }}>
+                    <span className="text-[13px] font-semibold leading-5">{index + 1}. {item.question}</span>
                     {item.answerType === "boolean" ? (
-                      <select className="input mt-2" value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))}>
+                      <select className="input mt-2.5" value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))}>
                         <option value="">Choose an answer</option><option value="yes">Yes</option><option value="no">No</option>
                       </select>
                     ) : item.answerType === "number" || item.answerType === "date" ? (
-                      <input className="input mt-2" type={item.answerType} value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))} />
+                      <input className="input mt-2.5" type={item.answerType} value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))} />
                     ) : item.answerType === "choice" ? (
-                      <input className="input mt-2" value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))} placeholder="Enter your chosen response" />
+                      <input className="input mt-2.5" value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))} placeholder="Enter your chosen response" />
                     ) : (
-                      <textarea className="input mt-2 min-h-[76px]" value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))} placeholder="Your answer" />
+                      <textarea className="input mt-2.5 min-h-[72px]" value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))} placeholder="Your answer" />
                     )}
                   </label>
                 );
@@ -1372,108 +1397,80 @@ export function EmployeeIdeaSubmissionPage({
             </div>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
-            <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(2))}>Back to develop</button>
-            <button className="btn-primary" type="button" disabled={!requiredQuestionsAnswered} onClick={() => dispatch(setIdeaWizardStep(4))}>Continue to pass or fail</button>
+            <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(2))}>Back</button>
+            <button className="btn-primary" type="button" disabled={!requiredQuestionsAnswered} onClick={() => dispatch(setIdeaWizardStep(4))}><Icon name="shield" className="mr-2 inline h-4 w-4" />Check: pass or fail</button>
           </div>
         </section>
       )}
       {step === 4 && (
-        <section className="app-card" aria-label="AI validation">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-medium">AI validation</h2>
-              <p className="mt-1 text-sm text-muted">
-                An AI score above 7/10 lets you continue to numbers. A score
-                of 7/10 or below needs an improved draft and another check.
+        <section className="rounded-[18px] border bg-[var(--card)] p-5 shadow-soft sm:p-6" style={{ borderColor: validation ? (validationPassed ? "rgba(14,159,122,.42)" : "rgba(30,94,255,.7)") : "var(--line)" }} aria-label="AI validation">
+          <div className="flex items-start gap-3">
+            <span className={`grid h-[38px] w-[38px] shrink-0 place-items-center rounded-[11px] ${validationPassed ? "bg-[#0e9f7a]/10 text-[#0e9f7a]" : "bg-blue/[.10] text-blue"}`}>
+              <Icon name={validationPassed ? "check" : "lock"} className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-[19px] font-semibold leading-6">{validation ? validationPassed ? "Validation passed" : "Not taken forward" : "AI validation"}</h2>
+                {validation && <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${validationPassed ? "border-[#0e9f7a]/40 bg-[#0e9f7a]/10 text-[#0e9f7a]" : "border-[#d6336c]/40 bg-[#d6336c]/10 text-[#d6336c]"}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{validationPassed ? "Pass" : "Fail"}</span>}
+              </div>
+              <p className="mt-1 min-h-[66px] text-sm leading-[1.55] text-muted">
+                {validation?.auditSummary ?? (validationPassed
+                  ? "The idea is clear, actionable, and addresses a real operational pain point."
+                  : validation
+                    ? "The idea needs more evidence and clearer scope before it can be confidently assessed."
+                    : "Check the idea against the bank’s criteria and see what to strengthen.")}
               </p>
             </div>
-            <button
-              className="btn"
-              disabled={
-                title.trim().length < 3 ||
-                summary.trim().length < 10 ||
-                createMutation.isPending ||
-                draftMutation.isPending ||
-                developmentMutation.isPending
-              }
-              onClick={() => void requestDevelopment("validate")}
-            >
-              {createMutation.isPending ||
-              draftMutation.isPending ||
-              developmentMutation.isPending
-                ? "Preparing…"
-                : "Check with AI"}
-            </button>
           </div>
-          {created && developmentQuery.isPending && (
-            <p className="mt-3 text-sm text-muted" aria-live="polite">
-              Loading validation…
+          {created && developmentQuery.isPending && <p className="mt-4 text-sm text-muted" aria-live="polite">Loading validation…</p>}
+          {validationRun && ["queued", "running"].includes(validationRun.status) && <p className="mt-4 rounded-lg border px-3 py-2 text-sm text-muted" style={{ borderColor: "var(--line)" }} aria-live="polite">AI is reviewing the current draft…</p>}
+          {validationRun && ["failed", "timed_out", "cancelled"].includes(validationRun.status) && <p className="mt-4 rounded-lg border border-[#d6336c]/40 px-3 py-2 text-sm text-[#d6336c]" role="alert">AI validation could not be completed. Run it again before continuing.</p>}
+          {!validation && !["queued", "running"].includes(validationRun?.status ?? "") && (
+            <div className="mt-5 rounded-xl border px-4 py-4 text-sm" style={{ borderColor: "var(--line)" }}>
+              <p className="text-muted">{validation ? "Your draft has changed since this result. Save the latest draft and run the AI check again." : "Your idea is ready for the AI pass or fail check."}</p>
+              <button className="btn-primary mt-3" type="button" disabled={busy || developmentMutation.isPending || title.trim().length < 3 || summary.trim().length < 10} onClick={() => void requestDevelopment("validate")}>{aiAction === "validate" || developmentMutation.isPending ? "Checking with AI…" : validation ? "Check the updated draft" : "Check: pass or fail"}</button>
+            </div>
+          )}
+          {validation && validationBreakdown && (
+            <div className="mt-[34px] overflow-x-auto">
+              <table className="w-full min-w-[650px] table-fixed border-collapse text-left text-[12.5px] leading-[1.5]">
+                <thead><tr className="border-b text-muted" style={{ borderColor: "var(--line)" }}><th className="w-[120px] px-2.5 pb-2.5 font-normal">Lens</th><th className="w-[70px] px-2.5 pb-2.5 font-normal">Weight</th><th className="w-[115px] px-2.5 pb-2.5 font-normal">Likely score</th><th className="px-2.5 pb-2.5 font-normal">Why</th></tr></thead>
+                <tbody>
+                  {validationBreakdown.rows.map((row) => <tr key={row.label} className="h-[76px] border-b align-top last:border-b-0" style={{ borderColor: "var(--line)" }}>
+                    <th className="px-2.5 py-3 font-normal">{row.label}</th>
+                    <td className="px-2.5 py-3 font-semibold">{Math.round(row.weight * 100)}%</td>
+                    <td className="px-2.5 py-3"><b className="font-semibold">{Number.isInteger(row.score) ? row.score : row.score.toFixed(1)}</b><span className="ml-1.5 text-[11px] text-muted"> {scoreBand(row.score)}</span></td>
+                    <td className="px-2.5 py-3 text-muted">{row.rationale}</td>
+                  </tr>)}
+                </tbody>
+              </table>
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted"><span>Estimated total from the idea as written</span><b className="whitespace-nowrap text-ink">{validationBreakdown.total.toFixed(2)} of 3.00</b></div>
+            </div>
+          )}
+          {validation && !validationBreakdown && <p className="mt-4 rounded-lg border p-3 text-sm text-muted" style={{ borderColor: "var(--line)" }}>The AI returned a validation result without the detailed scoring rubric. The overall score and review notes are shown below.</p>}
+          {validation && (
+            <div className="mt-5">
+              <h3 className="text-sm font-semibold">Weaknesses and what to do about them</h3>
+              {validation.gaps.length === 0 && validation.nextActions.length === 0 ? <p className="mt-2 text-sm text-muted">No material weaknesses were identified.</p> : <div className="mt-2 space-y-2">
+                {(validation.gaps.length ? validation.gaps : validation.nextActions.map((item) => item.action)).slice(0, 5).map((gap, index) => <article key={`${index}-${gap}`} className="rounded-[11px] border px-3.5 py-3" style={{ borderColor: "var(--line)" }}>
+                  <p className="text-[13px] font-medium">{gap}</p>
+                  {validation.nextActions[index] && <p className="mt-1 text-xs leading-[1.5] text-muted">{validation.nextActions[index].action}{validation.nextActions[index].ownerRole ? ` · Suggested owner: ${validation.nextActions[index].ownerRole}` : ""}</p>}
+                </article>)}
+              </div>}
+              {validation.risks.length > 0 && <p className="mt-3 text-xs leading-[1.5] text-muted"><b className="text-ink">Risks:</b> {validation.risks.map((item) => item.description).join(" · ")}</p>}
+              {validation.questions.length > 0 && <p className="mt-3 text-xs leading-[1.5] text-muted"><b className="text-ink">Questions to resolve:</b> {validation.questions.map((item) => item.question).join(" · ")}</p>}
+              {validationPassed && validation.strengths.length > 0 && <p className="mt-3 text-xs leading-[1.5] text-muted"><b className="text-ink">Strengths:</b> {validation.strengths.join(" · ")}</p>}
+            </div>
+          )}
+          {validation && !validationPassed && (
+            <p className="mt-4 rounded-lg bg-[#d6336c]/[.06] px-3.5 py-3 text-[13px] leading-[1.5] text-[#b4235b]" role="alert">
+              {validationScore === null
+                ? "Validation returned no usable score. Run validation again before continuing."
+                : `Your idea scored ${validationBreakdown?.total.toFixed(2) ?? (validationScore * 0.3).toFixed(2)} of 3.00. A score above 2.10 passes. This is failed result ${lowValidationRuns.length} of 2. Improve the draft and check again. After two failed results, you can continue to human review.`}
             </p>
           )}
-          {validationRun &&
-            ["queued", "running"].includes(validationRun.status) && (
-              <p className="mt-3 text-sm text-muted" aria-live="polite">
-                AI is reviewing the current draft…
-              </p>
-            )}
-          {validationRun &&
-            ["failed", "timed_out", "cancelled"].includes(
-              validationRun.status,
-            ) && (
-              <p className="mt-3 text-sm text-[#d6336c]" role="alert">
-                AI validation could not be completed. You must run validation
-                successfully before submission.
-              </p>
-            )}
-          {validation && (
-            <div className="mt-4 space-y-2 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: validationPassed ? "rgba(14,159,122,.45)" : "rgba(214,51,108,.4)" }} aria-live="polite">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted">AI idea score</p>
-                  <p className="mt-1 text-2xl font-semibold">{validationScore === null ? "—" : `${validationScore}/10`}</p>
-                </div>
-                <span className={`rounded-full px-3 py-1 text-sm font-medium ${validationPassed ? "bg-[#0e9f7a]/10 text-[#0e9f7a]" : "bg-[#d6336c]/10 text-[#d6336c]"}`}>
-                  {validationPassed ? "Pass · Continue to numbers" : "Fail · Improve and try again"}
-                </span>
-              </div>
-              <p>
-                <b>Validation {validationPassed ? "passed" : "failed"}:</b>{" "}
-                {validationScore === null ? "Score unavailable" : `${validationScore}/10`} ·{" "}
-                {validation.decision.replaceAll("_", " ")}
-              </p>
-              {validation.decision === "needs_human_review" && (
-                <p>AI recommends human review. This remains advisory; the separate safety check still applies when you submit.</p>
-              )}
-              {validation.strengths.length > 0 && (
-                <p>
-                  <b>Strengths:</b> {validation.strengths.join("; ")}
-                </p>
-              )}
-              {validation.gaps.length > 0 && (
-                <p>
-                  <b>Validation reasons:</b> {validation.gaps.join("; ")}
-                </p>
-              )}
-              {validation.questions.length > 0 && (
-                <p>
-                  <b>Questions:</b>{" "}
-                  {validation.questions.map((item) => item.question).join("; ")}
-                </p>
-              )}
-              {validation.risks.length > 0 && (
-                <p>
-                  <b>Risks:</b>{" "}
-                  {validation.risks.map((item) => item.description).join("; ")}
-                </p>
-              )}
-              {!validationPassed && (
-                <p className="text-[#d6336c]" role="alert">
-                  {validationScore === null
-                    ? "Validation returned no usable score. Run validation again before continuing."
-                    : `Your score is ${validationScore}/10. A score above 7 passes. This is below the threshold (failed result ${lowValidationRuns.length} of 2); improve your draft and check again. After two failed results for this idea, you can continue to human review.`}
-                </p>
-              )}
-            </div>
+          {validation && validationPassed && validationIsCurrent && (
+            <p className="mt-3 text-sm text-[#0e9f7a]" role="status">This result is for the current draft. You can continue to add the impact numbers.</p>
           )}
           {validationRun?.status === "succeeded" && !validationIsCurrent && (
             <p className="mt-3 text-sm text-[#d6336c]" role="alert">
@@ -1497,30 +1494,36 @@ export function EmployeeIdeaSubmissionPage({
               {developmentError}
             </p>
           )}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(3))}>Review idea questions</button>
-            {validation && !validationPassed && <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(2))}>Improve draft</button>}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            {validation && !validationPassed && <>
+              <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(2))}>Edit draft</button>
+              <button className="btn" type="button" disabled={aiAction === "validate" || developmentMutation.isPending} onClick={() => { dispatch(setIdeaWizardStep(2)); void requestDevelopment("enrich"); }}>Improve with AI</button>
+              <button className="btn-primary" type="button" disabled={aiAction === "validate" || developmentMutation.isPending || title.trim().length < 3 || summary.trim().length < 10} onClick={() => void requestDevelopment("validate")}>{aiAction === "validate" || developmentMutation.isPending ? "Checking…" : "Check with AI again"}</button>
+            </>}
             {canSubmitForHumanReview
               ? <button className="btn-primary" type="button" onClick={() => dispatch(setIdeaWizardStep(5))}>Continue to human review</button>
-              : <button className="btn-primary" type="button" disabled={!validationIsCurrent || !validationPassed} onClick={() => dispatch(setIdeaWizardStep(5))}>Continue to numbers</button>}
+              : validationPassed
+                ? <button className="btn-primary" type="button" disabled={!validationIsCurrent} onClick={() => dispatch(setIdeaWizardStep(5))}>Continue to the numbers</button>
+                : null}
           </div>
         </section>
       )}
       {step === 5 && (
         <section className="app-card" aria-label="Impact numbers">
-          <h2 className="text-lg font-medium">Three quick numbers</h2>
-          <p className="mt-1 text-sm text-muted">Your best estimate is enough; reviewers will check the figures with you. Add an optional explanation to strengthen your estimate. Your score updates as you type.</p>
+          <h2 className="text-lg font-semibold">Three quick numbers</h2>
+          <p className="mt-1 text-sm leading-6 text-muted">Rate the expected impact for each area. Add a short explanation to support your estimate. Your score updates as you type.</p>
           {canSubmitForHumanReview && !validationPassed && (
             <div className="mt-4 rounded-xl border border-sand/40 bg-sand/5 p-4 text-sm" role="status">
               <b>Continuing to human review after two failed AI checks.</b>
               <p className="mt-1 text-muted">Your score remains visible to reviewers. Complete the impact numbers to submit your idea for a person to assess.</p>
             </div>
           )}
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-3.5">
             {(["turnaround", "volume", "value"] as const).map((key) => {
-              const labels = { turnaround: "How much would turnaround time improve?", volume: "How many cases or customers are affected each month?", value: "What savings or revenue are expected per year?" };
+              const labels = { turnaround: "How much faster would the process or service be?", volume: "How many transactions, cases or customers would this affect each month?", value: "How much would this save in cost, or add in revenue, per year?" };
+              const units = { turnaround: "Impact rating · 0 to 3", volume: "Impact rating · 0 to 3", value: "Impact rating · 0 to 3" };
               const configured = priorityPolicyQuery.data?.kpis.find((item) => item.key === key);
-              return <div key={key} className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2 sm:items-center" style={{ borderColor: "var(--line)" }}><label className="block"><span className="field-label">{labels[key]}</span><input className="input" type="number" min="0" max="3" step="0.1" value={impact[key]} onChange={(event) => setImpact((current) => ({ ...current, [key]: event.target.value }))} placeholder="0" /><span className="mt-1 block text-xs text-muted">{configured?.hint ?? "Rate expected impact from 0 to 3"}{configured ? ` · ${Math.round(configured.weight * 100)}% weight` : ""}</span></label><label className="block"><span className="field-label">Explain your estimate <span className="ml-1 text-xs font-normal text-muted">Optional</span></span><textarea className="input min-h-[76px]" value={metricExplanations[key]} onChange={(event) => setMetricExplanations((current) => ({ ...current, [key]: event.target.value }))} placeholder="Where does the estimate come from? Who is affected? Add any supporting details." /></label></div>;
+              return <div key={key} className="grid gap-4 rounded-xl border p-3.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] sm:items-center sm:p-3.5" style={{ borderColor: "var(--line)"}}><label className="block"><span className="field-label">{labels[key]} <span className="ml-1 text-[10px] font-semibold text-blue">REQUIRED</span></span><div className="mt-2 flex flex-wrap items-center gap-2.5"><input className="input w-full max-w-[150px]" type="number" min="0" max="3" step="0.1" value={impact[key]} onChange={(event) => setImpact((current) => ({ ...current, [key]: event.target.value }))} placeholder="0" aria-label={`${labels[key]} impact rating`} /><span className="text-xs text-muted">{units[key]}</span></div><span className="mt-1 block text-xs text-muted">{configured?.hint ?? "Rate the expected impact from 0 to 3"}{configured ? ` · ${Math.round(configured.weight * 100)}% weight` : ""}</span></label><label className="block"><span className="field-label">Explain your estimate <span className="ml-1 text-[10px] font-semibold text-muted">OPTIONAL</span></span><textarea className="input mt-2 min-h-[70px]" value={metricExplanations[key]} onChange={(event) => setMetricExplanations((current) => ({ ...current, [key]: event.target.value }))} placeholder="Where does this estimate come from? Who is affected? Add supporting details." /></label></div>;
             })}
           </div>
           {priorityPolicyQuery.isPending && <p className="mt-4 text-sm text-muted" role="status">Loading priority policy…</p>}
@@ -1535,12 +1538,6 @@ export function EmployeeIdeaSubmissionPage({
       )}
       {step === 1 && (
         <div className="app-card">
-          {(savedDrafts.length > 0 || savedDraftsQuery.isError) && <section className="mb-5 rounded-xl border p-3" style={{ borderColor: "var(--line)" }} aria-label="Saved drafts">
-            <h2 className="font-medium">Your saved drafts</h2>
-            {savedDraftsQuery.isError && <p className="mt-1 text-sm text-[#d6336c]" role="alert">Could not load drafts: {errorMessage(savedDraftsQuery.error)} <button className="underline" type="button" onClick={() => void savedDraftsQuery.refetch()}>Retry</button></p>}
-            {savedDrafts.length > 0 && <ul className="mt-2 space-y-2">{savedDrafts.map((draft) => <li key={draft.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--hover)] p-2"><span className="min-w-0 flex-1"><b className="block truncate text-sm">{draft.title}</b><span className="block truncate text-xs text-muted">{draft.summary}</span></span><button className="btn btn-small" type="button" disabled={Boolean(resumeDraftId)} onClick={() => setResumeDraftId(draft.id)}>{resumeDraftId === draft.id && resumeDraftQuery.isPending ? "Loading…" : "Resume draft"}</button></li>)}</ul>}
-            {resumeDraftQuery.isError && <p className="mt-2 text-sm text-[#d6336c]" role="alert">Could not open this draft: {errorMessage(resumeDraftQuery.error)} <button className="underline" type="button" onClick={() => void resumeDraftQuery.refetch()}>Retry</button></p>}
-          </section>}
           <div
             className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl border bg-white p-1"
             style={{ borderColor: "var(--line)" }}
@@ -1656,6 +1653,12 @@ export function EmployeeIdeaSubmissionPage({
           >
             <Icon name="spark" /> Develop with AI
           </button>
+          {(savedDrafts.length > 0 || savedDraftsQuery.isError || resumeDraftQuery.isError) && <details className="mt-4 border-t pt-3" style={{ borderColor: "var(--line)" }} aria-label="Saved drafts">
+            <summary className="cursor-pointer text-sm font-medium">Your saved drafts{savedDrafts.length > 1 ? ` · ${savedDrafts.length}` : ""}</summary>
+            {savedDraftsQuery.isError && <p className="mt-2 text-sm text-[#d6336c]" role="alert">Could not load drafts: {errorMessage(savedDraftsQuery.error)} <button className="underline" type="button" onClick={() => void savedDraftsQuery.refetch()}>Retry</button></p>}
+            {savedDrafts.length > 0 && <ul className="mt-2 space-y-1.5">{savedDrafts.map((draft) => <li key={draft.id} className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate text-sm">{draft.title}</span><button className="btn btn-small shrink-0" type="button" disabled={Boolean(resumeDraftId)} onClick={() => setResumeDraftId(draft.id)}>{resumeDraftId === draft.id && resumeDraftQuery.isPending ? "Loading…" : "Resume draft"}</button></li>)}</ul>}
+            {resumeDraftQuery.isError && <p className="mt-2 text-sm text-[#d6336c]" role="alert">Could not open this draft: {errorMessage(resumeDraftQuery.error)} <button className="underline" type="button" onClick={() => void resumeDraftQuery.refetch()}>Retry</button></p>}
+          </details>}
         </div>
       )}
     </div>

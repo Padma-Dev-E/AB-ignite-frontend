@@ -7,6 +7,7 @@ import { SessionProvider } from "next-auth/react";
 import { createQueryClient } from "../lib/query/query-client";
 import { makeStore } from "../store";
 import { GlobalToastProvider } from "../components/ui/global-toast";
+import { GlobalLoadingIndicator } from "../components/ui/global-loading-indicator";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   // Instance-local lazy initialization isolates SSR requests and survives rerenders.
@@ -16,7 +17,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return createElement(SessionProvider, null,
     createElement(Provider, { store, children:
       createElement(QueryClientProvider, { client: queryClient },
-        createElement(GlobalToastProvider, null, children)),
+        createElement(GlobalToastProvider, null,
+          createElement(GlobalLoadingIndicator), children)),
     }),
   );
 }
