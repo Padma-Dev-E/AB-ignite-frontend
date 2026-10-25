@@ -387,15 +387,15 @@ export function EmployeeCommunityPage({
       <div className="grid items-stretch gap-[18px] min-[900px]:grid-cols-2">
         <section className="app-card">
           <h2 className="text-xl font-semibold">Happening now</h2>
-          <div className="mt-[-10px]">
+          <div className="mt-2">
             {challenge && <CommunityFeedRow icon="flag">
               <h3 className="text-[15px] font-medium leading-6">Challenge of the month</h3>
-              <p className="mt-1 text-[13px] leading-[1.6] text-muted">{challenge.question}{daysUntilChallengeCloses ? ` ${daysUntilChallengeCloses} days left.` : ""}</p>
+              <p className="mt-1 text-[13px] leading-[1.6] text-muted" style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden" }}>{challenge.question}{daysUntilChallengeCloses ? ` ${daysUntilChallengeCloses} days left.` : ""}</p>
               <button className="btn btn-small mt-2.5" onClick={() => onNavigate("new")}>Share an idea for it</button>
             </CommunityFeedRow>}
             {recommendedArticle ? <CommunityFeedRow icon="book">
               <h3 className="text-[15px] font-medium leading-6">Recommended for you</h3>
-              <p className="mt-1 text-[13px] leading-[1.6] text-muted">“{recommendedArticle.title}”, {recommendedArticle.readingMinutes} min. {recommendedArticle.recommendation.reason.split(". ")[0]}.</p>
+              <p className="mt-1 text-[13px] leading-[1.6] text-muted" style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden" }}>“{recommendedArticle.title}”, {recommendedArticle.readingMinutes} min. {recommendedArticle.recommendation.reason.split(". ")[0].replace(/[.!?]+$/, "")}.</p>
               <button className="btn btn-small mt-2.5" onClick={() => onOpenArticle(recommendedArticle.id)}>Read it</button>
             </CommunityFeedRow> : <CommunityFeedRow icon="book">
               <h3 className="text-[15px] font-medium leading-6">Grow your knowledge</h3>
