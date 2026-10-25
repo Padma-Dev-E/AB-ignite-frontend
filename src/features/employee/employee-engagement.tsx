@@ -27,27 +27,29 @@ function messageFor(error: unknown) {
     : "Something went wrong. Please try again.";
 }
 
-export function EmployeeFeedbackCampaignForm() {
+export function EmployeeFeedbackCampaignForm({ appearance = "default" }: { appearance?: "default" | "community" }) {
   const campaignQuery = useFeedbackCampaign();
   const submit = useSubmitEmployeeFeedback();
   const [category, setCategory] = useState<FeedbackCategory>("experience");
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const community = appearance === "community";
+  const cardClass = community ? "!border-[#c8d8ff] !bg-[#edf3ff] !text-[#17336f] !shadow-[0_12px_30px_-22px_rgba(11,45,120,.55)]" : "";
   if (campaignQuery.isPending)
     return (
-      <Card>
-        <p className="text-sm text-muted" role="status">
+      <Card className={cardClass}>
+        <p className={`text-sm ${community ? "text-[#53688f]" : "text-muted"}`} role="status">
           Loading feedback campaign…
         </p>
       </Card>
     );
   if (campaignQuery.isError)
     return (
-      <Card>
+      <Card className={cardClass}>
         <h2 className="text-lg font-medium">
           Feedback is temporarily unavailable
         </h2>
-        <p className="mt-1 text-sm text-muted">
+        <p className={`mt-1 text-sm ${community ? "text-[#53688f]" : "text-muted"}`}>
           {messageFor(campaignQuery.error)}
         </p>
         <Button className="mt-3" onClick={() => void campaignQuery.refetch()}>
@@ -58,9 +60,9 @@ export function EmployeeFeedbackCampaignForm() {
   const campaign = campaignQuery.data.campaign;
   if (!campaign)
     return (
-      <Card>
+      <Card className={cardClass}>
         <h2 className="text-lg font-medium">No active feedback campaign</h2>
-        <p className="mt-1 text-sm text-muted">
+        <p className={`mt-1 text-sm ${community ? "text-[#53688f]" : "text-muted"}`}>
           There isn’t a campaign open right now. Check back later.
         </p>
       </Card>
@@ -82,10 +84,10 @@ export function EmployeeFeedbackCampaignForm() {
     }
   }
   return (
-    <Card>
+    <Card className={cardClass}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <span className="text-[11px] font-medium uppercase tracking-[.12em] text-blue">
+          <span className={`text-[11px] font-medium uppercase tracking-[.12em] ${community ? "text-[#3157a2]" : "text-blue"}`}>
             Pinned · Feedback campaign
           </span>
           <h2 className="mt-1 text-xl font-medium">{campaign.title}</h2>
@@ -96,7 +98,7 @@ export function EmployeeFeedbackCampaignForm() {
         </span>
       </div>
       {campaign.description && (
-        <p className="mt-2 text-sm leading-6 text-muted">
+        <p className={`mt-2 text-sm leading-6 ${community ? "text-[#53688f]" : "text-muted"}`}>
           {campaign.description}
         </p>
       )}
@@ -116,9 +118,9 @@ export function EmployeeFeedbackCampaignForm() {
           }}
         >
           <label className="block">
-            <span className="field-label">Category</span>
+            <span className={`field-label ${community ? "text-[#27477f]" : ""}`}>Category</span>
             <select
-              className="input"
+              className={`input ${community ? "!border-[#bdcffa] !bg-white !text-[#152b55]" : ""}`}
               value={category}
               onChange={(event) =>
                 setCategory(event.target.value as FeedbackCategory)
@@ -132,9 +134,9 @@ export function EmployeeFeedbackCampaignForm() {
             </select>
           </label>
           <label className="block">
-            <span className="field-label">Your feedback</span>
+            <span className={`field-label ${community ? "text-[#27477f]" : ""}`}>Your feedback</span>
             <textarea
-              className="input min-h-[100px] resize-y"
+              className={`input min-h-[100px] resize-y ${community ? "!border-[#bdcffa] !bg-white !text-[#152b55] placeholder:!text-[#7787a5]" : ""}`}
               value={message}
               onChange={(event) => setMessage(event.target.value)}
               maxLength={4000}

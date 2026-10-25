@@ -2201,6 +2201,9 @@ export default function Home(props: unknown) {
     page === "community" ? (
       <EmployeeCommunityPage
         points={points}
+        levelName={rewardsSummaryQuery.data?.level?.name ?? null}
+        pointsLoading={rewardsSummaryQuery.isPending}
+        pointsError={rewardsSummaryQuery.isError}
         onNavigate={navigate}
         onOpenIdea={openIdea}
       />
@@ -2241,6 +2244,9 @@ export default function Home(props: unknown) {
     ) : (
       <EmployeeCommunityPage
         points={points}
+        levelName={rewardsSummaryQuery.data?.level?.name ?? null}
+        pointsLoading={rewardsSummaryQuery.isPending}
+        pointsError={rewardsSummaryQuery.isError}
         onNavigate={navigate}
         onOpenIdea={openIdea}
       />

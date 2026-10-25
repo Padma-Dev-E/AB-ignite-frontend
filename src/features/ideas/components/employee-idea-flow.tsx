@@ -279,10 +279,16 @@ export function EmployeeCommunityPage({
   onNavigate,
   onOpenIdea,
   points = 0,
+  levelName = null,
+  pointsLoading = false,
+  pointsError = false,
 }: {
   onNavigate: (page: Page) => void;
   onOpenIdea: (id: number) => void;
   points?: number;
+  levelName?: string | null;
+  pointsLoading?: boolean;
+  pointsError?: boolean;
 }) {
   const profileQuery = useEmployeeProfile();
   const challengesQuery = useLearningChallenges();
@@ -331,28 +337,31 @@ export function EmployeeCommunityPage({
           </button>
         </div>
         <div className="hero-surface rounded-[18px] p-5 text-white shadow-[0_18px_36px_-18px_var(--blue-deep)] w-full shrink-0 sm:w-[340px]">
-          <div className="text-xs font-medium tracking-[.14em]">
-            AB IGNITE
+          <div className="flex items-center justify-between gap-3 text-xs font-medium tracking-[.12em]">
+            <span>AB IGNITE</span>
+            <span className="rounded-md border border-white/45 bg-white/10 px-2 py-1 text-[10px] tracking-normal">
+              {pointsLoading ? "Loading level…" : pointsError ? "Level unavailable" : levelName ?? "Starting level"}
+            </span>
           </div>
           <div className="mt-4 h-7 w-10 rounded-md bg-gradient-to-br from-amber-200 to-amber-500" aria-hidden="true" />
           <div className="mt-4 text-[36px] font-semibold leading-none">
-            💡 {points.toLocaleString("en-US")}
+            {pointsLoading ? "Loading…" : pointsError ? "Unavailable" : `💡 ${points.toLocaleString("en-US")}`}
           </div>
           <div className="mt-1 text-xs text-white/80">
             Ignite account balance, in points
           </div>
           <div className="mt-5 flex flex-wrap justify-between gap-2 text-xs text-white/80">
-            <span>{profile?.name ?? "Your Ignite account"}</span>
+            <span className="font-medium">{profile?.name ?? "Loading profile…"}</span>
             {rank && <span>Rank {rank.rank} this season</span>}
           </div>
         </div>
       </div>
       <section className="hero-surface overflow-hidden rounded-[24px] p-6 text-white shadow-lg sm:p-8" aria-label="Feedback campaign">
-        <div className="[&>div]:border-0 [&>div]:bg-transparent [&>div]:p-0 [&>div]:shadow-none [&_h2]:text-2xl [&_p]:text-white/85 [&_span]:text-white [&_.field-label]:text-white [&_input]:text-ink [&_textarea]:text-ink [&_select]:text-ink [&_form]:rounded-xl [&_form]:bg-white/10 [&_form]:p-4">
+        <div>
           <button className="mb-4 rounded-lg border border-white/50 px-4 py-2 text-sm font-medium" aria-expanded={showFeedback} onClick={() => setShowFeedback((value) => !value)}>
             <span className="inline-flex items-center gap-2"><Icon name="msg" />{showFeedback ? "Close feedback form" : "Share Your Feedback"}</span>
           </button>
-          <div className={showFeedback ? "" : "[&_form]:hidden"}><EmployeeFeedbackCampaignForm /></div>
+          <div className={showFeedback ? "mt-4" : "hidden"}><EmployeeFeedbackCampaignForm appearance="community" /></div>
         </div>
       </section>
       <div className="grid items-stretch gap-5 md:grid-cols-2">
