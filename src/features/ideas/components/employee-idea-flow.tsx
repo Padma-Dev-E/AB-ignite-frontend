@@ -280,6 +280,7 @@ export function EmployeeCommunityPage({
   onOpenIdea,
   points = 0,
   levelName = null,
+  levelIndex = null,
   pointsLoading = false,
   pointsError = false,
 }: {
@@ -287,6 +288,7 @@ export function EmployeeCommunityPage({
   onOpenIdea: (id: number) => void;
   points?: number;
   levelName?: string | null;
+  levelIndex?: number | null;
   pointsLoading?: boolean;
   pointsError?: boolean;
 }) {
@@ -296,7 +298,12 @@ export function EmployeeCommunityPage({
   const profile = profileQuery.data;
   const rank = rankingsQuery.data?.items.find((item) => item.name === profile?.name && item.department === profile?.department);
   const challenge = challengesQuery.data?.items[0];
-  const [showFeedback, setShowFeedback] = useState(false);
+  const firstName = profile?.name?.trim().split(/\s+/)[0];
+  const [greeting, setGreeting] = useState("Good morning");
+  useEffect(() => {
+    const hour = new Date().getHours();
+    setGreeting(hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening");
+  }, []);
   const [filter, setFilter] = useState("Everything");
   const [query, setQuery] = useState("");
   const params = useMemo(
@@ -321,12 +328,12 @@ export function EmployeeCommunityPage({
   );
   return (
     <div className="stack">
-      <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
+      <div className="flex flex-col justify-between gap-6 min-[900px]:flex-row min-[900px]:items-center">
         <div>
-          <h1 className="text-[26px] font-medium tracking-[-.02em] sm:text-[32px]">
-            Hello{profile?.name ? `, ${profile.name}` : ""} <span aria-hidden="true">👋</span>
+          <h1 className="text-[26px] font-semibold tracking-[-.035em] sm:text-[32px]">
+            {greeting}{firstName ? `, ${firstName}` : ""} <span aria-hidden="true">👋</span>
           </h1>
-          <p className="mt-1.5 text-base text-muted">
+          <p className="mt-2 text-[15px] text-muted">
             Your next idea could improve how we serve customers and each other.
           </p>
           <button
@@ -336,35 +343,31 @@ export function EmployeeCommunityPage({
             <Icon name="spark" /> Share an idea
           </button>
         </div>
-        <div className="hero-surface rounded-[18px] p-5 text-white shadow-[0_18px_36px_-18px_var(--blue-deep)] w-full shrink-0 sm:w-[340px]">
-          <div className="flex items-center justify-between gap-3 text-xs font-medium tracking-[.12em]">
+        <button type="button" onClick={() => onNavigate("me")} aria-label="Open your Ignite account and points balance" className="hero-surface relative aspect-[1.7] w-full shrink-0 overflow-hidden rounded-[18px] p-5 text-left text-white shadow-[0_18px_36px_-18px_var(--blue-deep)] transition-transform hover:-translate-y-0.5 focus-visible:outline-white sm:w-[340px]">
+          <span className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border border-white/10" aria-hidden="true" />
+          <span className="pointer-events-none absolute -right-7 -top-14 h-44 w-44 rounded-full border border-white/10" aria-hidden="true" />
+          <span className="relative flex items-center justify-between gap-3 text-[11px] font-semibold tracking-[.16em]">
             <span>AB IGNITE</span>
-            <span className="rounded-md border border-white/45 bg-white/10 px-2 py-1 text-[10px] tracking-normal">
-              {pointsLoading ? "Loading level…" : pointsError ? "Level unavailable" : levelName ?? "Starting level"}
+            <span className="rounded-full border border-white/40 bg-white/10 px-2.5 py-1 text-[10px] tracking-[.08em]">
+              {pointsLoading ? "LEVEL …" : pointsError ? "LEVEL —" : `LEVEL ${levelIndex ?? 1}`}
             </span>
-          </div>
-          <div className="mt-4 h-7 w-10 rounded-md bg-gradient-to-br from-amber-200 to-amber-500" aria-hidden="true" />
-          <div className="mt-4 text-[36px] font-semibold leading-none">
+          </span>
+          <span className="relative mt-4 grid h-[26px] w-[36px] overflow-hidden rounded-[5px] border border-amber-100/60 bg-gradient-to-br from-[#ffe7a0] via-[#d9aa4b] to-[#f7d77d] shadow-inner" aria-hidden="true">
+            <span className="absolute inset-y-0 left-1/2 w-px bg-amber-900/30" />
+            <span className="absolute inset-x-0 top-1/2 h-px bg-amber-900/25" />
+          </span>
+          <span className="relative mt-3 block text-[32px] font-semibold leading-none tracking-[-.04em]">
             {pointsLoading ? "Loading…" : pointsError ? "Unavailable" : `💡 ${points.toLocaleString("en-US")}`}
-          </div>
-          <div className="mt-1 text-xs text-white/80">
-            Ignite account balance, in points
-          </div>
-          <div className="mt-5 flex flex-wrap justify-between gap-2 text-xs text-white/80">
-            <span className="font-medium">{profile?.name ?? "Loading profile…"}</span>
-            {rank && <span>Rank {rank.rank} this season</span>}
-          </div>
-        </div>
+          </span>
+          <span className="relative mt-1 block text-[11px] text-white/80">Ignite account balance, in points</span>
+          <span className="relative mt-4 flex items-end justify-between gap-2 text-[10px] leading-tight text-white/85">
+            <span className="min-w-0 truncate font-medium tracking-[.08em]">ABI {String(profile?.id ?? "----").padStart(4, "0")}　••••　{(firstName ?? "EMPLOYEE").toUpperCase()}</span>
+            <span className="max-w-[110px] truncate text-right">{rank ? `Rank ${rank.rank}` : levelName ?? "Ignite member"}</span>
+          </span>
+        </button>
       </div>
-      <section className="hero-surface overflow-hidden rounded-[24px] p-6 text-white shadow-lg sm:p-8" aria-label="Feedback campaign">
-        <div>
-          <button className="mb-4 rounded-lg border border-white/50 px-4 py-2 text-sm font-medium" aria-expanded={showFeedback} onClick={() => setShowFeedback((value) => !value)}>
-            <span className="inline-flex items-center gap-2"><Icon name="msg" />{showFeedback ? "Close feedback form" : "Share Your Feedback"}</span>
-          </button>
-          <div className={showFeedback ? "mt-4" : "hidden"}><EmployeeFeedbackCampaignForm appearance="community" /></div>
-        </div>
-      </section>
-      <div className="grid items-stretch gap-5 md:grid-cols-2">
+      <EmployeeFeedbackCampaignForm appearance="community" />
+      <div className="grid items-stretch gap-[18px] min-[900px]:grid-cols-2">
         <section className="app-card">
           <h2 className="text-xl font-semibold">Happening now</h2>
           <div className="mt-5 divide-y divide-[var(--line)]">
@@ -446,7 +449,7 @@ export function EmployeeCommunityPage({
           }
         />
       ) : (
-        <div className="grid gap-[18px] xl:grid-cols-2">
+        <div className="grid gap-[18px] min-[620px]:grid-cols-2">
           {items.map((idea) => (
             <IdeaCard
               key={idea.id}

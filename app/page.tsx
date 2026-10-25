@@ -61,6 +61,7 @@ import { notificationDestination, notificationLocation } from "../src/features/e
 import { NotificationNavigationProvider } from "../src/features/employee/notification-navigation-context";
 import { NotificationAnnouncementDetail, NotificationFeedbackDetail, NotificationRecommendationDetail } from "../src/features/employee/notification-destinations";
 import { EmployeeProfileCard } from "../src/features/employee/employee-profile";
+import { useEmployeeProfile } from "../src/features/employee/profile-hooks";
 import { PortalBrand, PortalTopBar, portalNavigationClass, portalNavigationItemClass, portalSidebarClass } from "../src/components/layout/portal-shell";
 import { logoutToLogin } from "../src/auth/logout";
 
@@ -231,6 +232,8 @@ function SideNav({
   onNavigate,
   onSignOut,
   adminPortalRole,
+  displayName,
+  department,
 }: {
   page: Page;
   open: boolean;
@@ -238,6 +241,8 @@ function SideNav({
   onNavigate: (page: Page) => void;
   onSignOut: () => void;
   adminPortalRole: "back_office" | "business_owner" | null;
+  displayName?: string;
+  department?: string;
 }) {
   return (
     <aside
@@ -273,9 +278,9 @@ function SideNav({
         className="mt-auto rounded-[14px] border p-3.5 text-[12.5px] text-muted"
         style={{ borderColor: "var(--line)" }}
       >
-        <b className="font-medium text-ink">padmadev</b>
+        <b className="font-medium text-ink">{displayName || "My account"}</b>
         <br />
-        Technology
+        {department || "Employee"}
         <br />
         {adminPortalRole && <Link href="/private/admin" className="mt-2 inline-block font-medium text-blue">Return to your {adminPortalRole === "business_owner" ? "business-owner" : "back-office"} portal</Link>}
         <button onClick={onSignOut} className="mt-2 block text-blue">
@@ -294,6 +299,7 @@ function TopBar({
   onNavigate,
   onNotifications,
   notificationsOpen,
+  displayName,
 }: {
   page: Page;
   points: number;
@@ -302,6 +308,7 @@ function TopBar({
   onNavigate: (page: Page) => void;
   onNotifications: () => void;
   notificationsOpen: boolean;
+  displayName?: string;
 }) {
   return (
     <PortalTopBar>
@@ -344,7 +351,7 @@ function TopBar({
         )}
       </button>
       <button onClick={() => onNavigate("me")} className="hidden sm:block">
-        <Avatar name="padmadev" />
+        <Avatar name={displayName || "Employee"} />
       </button>
     </PortalTopBar>
   );
@@ -2123,6 +2130,7 @@ export default function Home(props: unknown) {
   const focusAfterNotification = useRef(false);
   const notificationsQuery = useEmployeeNotifications(signedIn);
   const rewardsSummaryQuery = usePointsSummary(signedIn);
+  const profileQuery = useEmployeeProfile(signedIn);
   const setNotificationRead = useSetEmployeeNotificationRead();
 
   useEffect(() => {
@@ -2202,6 +2210,7 @@ export default function Home(props: unknown) {
       <EmployeeCommunityPage
         points={points}
         levelName={rewardsSummaryQuery.data?.level?.name ?? null}
+        levelIndex={rewardsSummaryQuery.data?.level?.id ?? null}
         pointsLoading={rewardsSummaryQuery.isPending}
         pointsError={rewardsSummaryQuery.isError}
         onNavigate={navigate}
@@ -2245,6 +2254,7 @@ export default function Home(props: unknown) {
       <EmployeeCommunityPage
         points={points}
         levelName={rewardsSummaryQuery.data?.level?.name ?? null}
+        levelIndex={rewardsSummaryQuery.data?.level?.id ?? null}
         pointsLoading={rewardsSummaryQuery.isPending}
         pointsError={rewardsSummaryQuery.isError}
         onNavigate={navigate}
@@ -2254,7 +2264,7 @@ export default function Home(props: unknown) {
   const activeNavPage: Page = page === "feedback" ? "me" : page === "recommendation" ? "library" : page === "announcement" ? "community" : page;
   return (
     <div className="app-background min-h-screen">
-      <div className="grid min-h-screen lg:grid-cols-[300px_1fr]">
+      <div className="grid min-h-screen lg:grid-cols-[240px_1fr]">
         <SideNav
           page={activeNavPage}
           open={menuOpen}
@@ -2262,6 +2272,8 @@ export default function Home(props: unknown) {
           onNavigate={navigate}
           onSignOut={signOut}
           adminPortalRole={adminPortalRole}
+          displayName={profileQuery.data?.name}
+          department={profileQuery.data?.department}
         />
         <div className="min-w-0">
           <TopBar
@@ -2272,9 +2284,10 @@ export default function Home(props: unknown) {
             onNavigate={navigate}
             onNotifications={() => setNotificationsOpen(true)}
             notificationsOpen={notificationsOpen}
+            displayName={profileQuery.data?.name}
           />
           <NotificationNavigationProvider onOpen={openNotification}>
-            <main ref={mainRef} tabIndex={-1} className="mx-auto w-full max-w-[1230px] px-3.5 pb-28 pt-[18px] outline-none sm:px-7 sm:pb-[70px] sm:pt-9">
+            <main ref={mainRef} tabIndex={-1} className="mx-auto w-full max-w-[1040px] px-3.5 pb-28 pt-7 outline-none sm:px-7 sm:pb-[70px]">
               {pageContent}
             </main>
           </NotificationNavigationProvider>

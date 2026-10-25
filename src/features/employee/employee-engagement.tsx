@@ -33,9 +33,12 @@ export function EmployeeFeedbackCampaignForm({ appearance = "default" }: { appea
   const [category, setCategory] = useState<FeedbackCategory>("experience");
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const community = appearance === "community";
-  const cardClass = community ? "!border-[#c8d8ff] !bg-[#edf3ff] !text-[#17336f] !shadow-[0_12px_30px_-22px_rgba(11,45,120,.55)]" : "";
+  const cardClass = "";
   if (campaignQuery.isPending)
+    if (community) return <section className="pinned-surface rounded-[20px] px-6 py-7 text-white shadow-[0_18px_36px_-18px_var(--blue-deep)]" aria-label="Feedback campaign"><p className="text-sm text-white/85" role="status">Loading feedback campaign…</p></section>;
+    else
     return (
       <Card className={cardClass}>
         <p className={`text-sm ${community ? "text-[#53688f]" : "text-muted"}`} role="status">
@@ -44,6 +47,8 @@ export function EmployeeFeedbackCampaignForm({ appearance = "default" }: { appea
       </Card>
     );
   if (campaignQuery.isError)
+    if (community) return <section className="pinned-surface rounded-[20px] px-6 py-7 text-white shadow-[0_18px_36px_-18px_var(--blue-deep)]" aria-label="Feedback campaign"><h2 className="text-lg font-semibold">Feedback is temporarily unavailable</h2><p className="mt-1 text-sm text-white/80" role="alert">{messageFor(campaignQuery.error)}</p><Button className="mt-3 border-white/50 bg-white/10 text-white hover:bg-white/20" onClick={() => void campaignQuery.refetch()}>Try again</Button></section>;
+    else
     return (
       <Card className={cardClass}>
         <h2 className="text-lg font-medium">
@@ -58,6 +63,7 @@ export function EmployeeFeedbackCampaignForm({ appearance = "default" }: { appea
       </Card>
     );
   const campaign = campaignQuery.data.campaign;
+  if (!campaign && community) return null;
   if (!campaign)
     return (
       <Card className={cardClass}>
@@ -83,6 +89,35 @@ export function EmployeeFeedbackCampaignForm({ appearance = "default" }: { appea
       /* mutation error is displayed inline */
     }
   }
+  if (community) return (
+    <section className="pinned-surface relative overflow-hidden rounded-[20px] px-6 py-7 text-white shadow-[0_18px_36px_-18px_var(--blue-deep)] sm:px-8" aria-label="Feedback campaign">
+      <span className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full border border-white/10" aria-hidden="true" />
+      <span className="pointer-events-none absolute -right-5 -top-12 h-48 w-48 rounded-full border border-white/10" aria-hidden="true" />
+      <div className="relative max-w-[720px]">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[.16em] text-white/75">Pinned · Feedback campaign</span>
+          <span className="rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[11px] font-medium">Open</span>
+        </div>
+        <h2 className="mt-3 text-[21px] font-semibold tracking-[-.02em]">{campaign.title}</h2>
+        {campaign.description && <p className="mt-2 max-w-[680px] text-sm leading-6 text-white/85">{campaign.description}</p>}
+        {submitted || alreadyResponded ? (
+          <p className="mt-5 inline-flex rounded-xl border border-white/30 bg-white/10 px-4 py-3 text-sm text-white" role="status">Thanks for sharing your feedback. Your response has been received.</p>
+        ) : (
+          <button type="button" className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-[10px] bg-white px-4 py-2 text-[13px] font-semibold text-[#174bc9] shadow-sm transition hover:bg-[#f1f5ff]" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+            {expanded ? "Close feedback form" : "Share Your Feedback"}
+          </button>
+        )}
+        {expanded && !submitted && !alreadyResponded && <div className="mt-5 rounded-[16px] border border-white/30 bg-white/[.97] p-5 text-ink shadow-[0_12px_30px_-22px_rgba(11,45,120,.6)] sm:p-6">
+          <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void sendFeedback(); }}>
+            <label className="block"><span className="field-label">Category</span><select className="input" value={category} onChange={(event) => setCategory(event.target.value as FeedbackCategory)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+            <label className="block"><span className="field-label">Your feedback</span><textarea className="input min-h-[100px] resize-y" value={message} onChange={(event) => setMessage(event.target.value)} maxLength={4000} required placeholder="What would make your experience better?" /></label>
+            {submit.isError && <p className="text-sm text-[#d6336c]" role="alert">{messageFor(submit.error)}</p>}
+            <Button variant="primary" type="submit" disabled={!message.trim() || submit.isPending}>{submit.isPending ? "Sending…" : "Send feedback"}</Button>
+          </form>
+        </div>}
+      </div>
+    </section>
+  );
   return (
     <Card className={cardClass}>
       <div className="flex flex-wrap items-start justify-between gap-3">

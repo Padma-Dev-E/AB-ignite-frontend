@@ -5,8 +5,8 @@ import { getEmployeeProfile, updateEmployeeProfile, type EmployeeProfileUpdate }
 
 export const employeeProfileQueryKeys = { profile: ["employee", "profile"] as const };
 
-export function useEmployeeProfile() {
-  return useQuery({ queryKey: employeeProfileQueryKeys.profile, queryFn: getEmployeeProfile });
+export function useEmployeeProfile(enabled = true) {
+  return useQuery({ queryKey: employeeProfileQueryKeys.profile, queryFn: getEmployeeProfile, enabled });
 }
 
 export function useUpdateEmployeeProfile() {
