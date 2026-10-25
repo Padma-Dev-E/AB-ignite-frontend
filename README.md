@@ -9,3 +9,5 @@ Next.js employee and privileged-workspace UI. Business requests are proxied to t
 3. Run `npm ci`, then `npm run dev`.
 
 The frontend owns the browser-facing Auth.js session. Credential verification and session state are performed by the backend over the private API network.
+
+Only UI-facing helpers remain alongside the screens: password field feedback, permission-based visibility, and live idea-score/AI-progress previews. These improve interaction only; Fastify owns and rechecks the rules before changing data.

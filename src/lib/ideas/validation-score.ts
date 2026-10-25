@@ -1,3 +1,4 @@
+/** UI display/progression hint only; the backend makes the submission decision. */
 /** Persisted validation runs before the 0–10 change used a 0–100 scale. */
 export const IDEA_VALIDATION_PASS_SCORE = 7;
 

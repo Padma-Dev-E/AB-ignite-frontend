@@ -3,5 +3,6 @@ node_modules/
 .next-dev/
 .env
 .env.*
+!.env.example
 *.tsbuildinfo
 coverage/

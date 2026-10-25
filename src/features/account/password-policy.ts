@@ -1,3 +1,4 @@
+// Client feedback only. The backend independently validates every password change.
 import { z } from 'zod';
 export const passwordPolicyHint = 'At least 10 characters, with upper and lower case letters and a digit.';
 export const passwordInput = z.strictObject({

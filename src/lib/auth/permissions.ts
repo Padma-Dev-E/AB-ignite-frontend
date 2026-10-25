@@ -1,3 +1,4 @@
+// UI-only capability labels and visibility hints; Fastify remains authoritative.
 export const CAPABILITIES = {
   IDEAS_READ: "ideas.read",
   IDEAS_WRITE: "ideas.write",
