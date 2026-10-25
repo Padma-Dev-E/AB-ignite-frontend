@@ -1,4 +1,6 @@
-FROM node:22-bookworm-slim AS dependencies
+ARG NODE_IMAGE=node:24-bookworm-slim
+
+FROM ${NODE_IMAGE} AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -17,7 +19,7 @@ ENV NEXT_PUBLIC_AUTH_REFRESH_INTERVAL_SECONDS=${NEXT_PUBLIC_AUTH_REFRESH_INTERVA
     NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM node:22-bookworm-slim AS runtime
+FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
