@@ -92,12 +92,14 @@ export function EmployeeFeedbackCampaignForm({ appearance = "default" }: { appea
   }
   if (community) return (
     <section className="pinned-surface relative overflow-hidden rounded-[20px] px-6 py-7 text-white shadow-[0_18px_36px_-18px_var(--blue-deep)] sm:px-8" aria-label="Feedback campaign">
-      <span className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full border border-white/10" aria-hidden="true" />
-      <span className="pointer-events-none absolute -right-5 -top-12 h-48 w-48 rounded-full border border-white/10" aria-hidden="true" />
+      <span className="pointer-events-none absolute right-[36px] top-[8px] h-[96px] w-[96px] rounded-full bg-white/[.12]" aria-hidden="true" />
+      <span className="pointer-events-none absolute right-[132px] top-[64px] h-[54px] w-[54px] rounded-full bg-white/[.11]" aria-hidden="true" />
+      <span className="pointer-events-none absolute right-[10px] top-[84px] h-[42px] w-[42px] rounded-full bg-white/[.11]" aria-hidden="true" />
+      <span className="pointer-events-none absolute right-[116px] top-[8px] h-[24px] w-[24px] rounded-full bg-white/[.10]" aria-hidden="true" />
+      <span className="pointer-events-none absolute right-[20px] top-[8px] h-[16px] w-[16px] rounded-full bg-white/[.10]" aria-hidden="true" />
       <div className="relative max-w-[720px]">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-[.16em] text-white/75">Pinned · Feedback campaign</span>
-          <span className="rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[11px] font-medium">Open</span>
         </div>
         <h2 className="mt-3 text-[21px] font-semibold tracking-[-.02em]">{campaign.title}</h2>
         {campaign.description && <p className="mt-2 max-w-[680px] text-sm leading-6 text-white/85">{campaign.description}</p>}

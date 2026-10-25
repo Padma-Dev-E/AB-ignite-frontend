@@ -65,6 +65,12 @@ const iconPaths = {
 } as const;
 type IconName = keyof typeof iconPaths;
 
+function ordinal(value: number) {
+  const lastTwo = value % 100;
+  const suffix = lastTwo >= 11 && lastTwo <= 13 ? "th" : value % 10 === 1 ? "st" : value % 10 === 2 ? "nd" : value % 10 === 3 ? "rd" : "th";
+  return `${value}${suffix}`;
+}
+
 function Icon({
   name,
   className = "h-[19px] w-[19px]",
@@ -348,11 +354,12 @@ export function EmployeeCommunityPage({
         <button type="button" onClick={() => onNavigate("me")} aria-label="Open your Ignite account and points balance" className="hero-surface relative aspect-[1.7] w-full shrink-0 overflow-hidden rounded-[18px] p-5 text-left text-white shadow-[0_18px_36px_-18px_var(--blue-deep)] transition-transform hover:-translate-y-0.5 focus-visible:outline-white sm:w-[340px]">
           <span className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full border border-white/10" aria-hidden="true" />
           <span className="pointer-events-none absolute -right-7 -top-14 h-44 w-44 rounded-full border border-white/10" aria-hidden="true" />
-          <span className="relative flex items-center justify-between gap-3 text-[11px] font-semibold tracking-[.16em]">
+          <span className="relative flex items-center justify-between gap-2 text-[10px] font-semibold tracking-[.13em]">
             <span>AB IGNITE</span>
-            <span className="rounded-full border border-white/40 bg-white/10 px-2.5 py-1 text-[10px] tracking-[.08em]">
+            <span className="rounded-full border border-white/40 bg-white/10 px-2 py-1 text-[9px] tracking-[.08em]">
               {pointsLoading ? "LEVEL …" : pointsError ? "LEVEL —" : `LEVEL ${levelIndex ?? 1}`}
             </span>
+            <span className="whitespace-nowrap text-[10px] font-normal tracking-normal text-white/90">🥇 {rank ? `${ordinal(rank.rank)} this season` : "Season ranking"}</span>
           </span>
           <span className="relative mt-4 grid h-[26px] w-[36px] overflow-hidden rounded-[5px] border border-amber-100/60 bg-gradient-to-br from-[#ffe7a0] via-[#d9aa4b] to-[#f7d77d] shadow-inner" aria-hidden="true">
             <span className="absolute inset-y-0 left-1/2 w-px bg-amber-900/30" />
@@ -364,7 +371,7 @@ export function EmployeeCommunityPage({
           <span className="relative mt-1 block text-[11px] text-white/80">Ignite account balance, in points</span>
           <span className="relative mt-4 flex items-end justify-between gap-2 text-[10px] leading-tight text-white/85">
             <span className="min-w-0 truncate font-medium tracking-[.08em]">ABI {String(profile?.id ?? "----").padStart(4, "0")}　••••　{(firstName ?? "EMPLOYEE").toUpperCase()}</span>
-            <span className="max-w-[110px] truncate text-right">{rank ? `Rank ${rank.rank}` : levelName ?? "Ignite member"}</span>
+            <span className="max-w-[110px] truncate text-right">{levelName ?? "Ignite member"}</span>
           </span>
         </button>
       </div>
