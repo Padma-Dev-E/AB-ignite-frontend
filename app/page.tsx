@@ -2220,6 +2220,7 @@ export default function Home(props: unknown) {
         onNavigate={navigate}
         onOpenIdea={openIdea}
         onOpenAnnouncement={openAnnouncement}
+        onOpenArticle={(id) => { setSelectedArticleId(id); navigate("article"); }}
       />
     ) : page === "new" ? (
       <EmployeeIdeaSubmissionPage onOpenIdea={openIdea} />
@@ -2265,6 +2266,7 @@ export default function Home(props: unknown) {
         onNavigate={navigate}
         onOpenIdea={openIdea}
         onOpenAnnouncement={openAnnouncement}
+        onOpenArticle={(id) => { setSelectedArticleId(id); navigate("article"); }}
       />
     );
   const activeNavPage: Page = page === "feedback" ? "me" : page === "recommendation" ? "library" : page === "announcement" ? "community" : page;

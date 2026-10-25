@@ -11,6 +11,7 @@ import {
   useSubmitEmployeeFeedback,
 } from "./engagement-hooks";
 import type { FeedbackCategory, Notification, PublishedAnnouncement } from "./engagement-api";
+import { CommunityFeedRow, type CommunityFeedIconName } from "./community-feed";
 import { notificationDestination } from "./notification-navigation";
 import { useNotificationNavigation } from "./notification-navigation-context";
 
@@ -334,7 +335,7 @@ export function EmployeeCommunityUpdates({
     ...notifications
       .filter((item) => !(item.target.type === "announcement" && item.target.id !== null && announcementIds.has(item.target.id)))
       .map((notification) => ({ kind: "notification" as const, notification, date: notification.createdAt })),
-  ].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 6);
+  ].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 4);
 
   if (announcementsQuery.isPending && notificationsQuery.isPending) {
     return <p className="mt-4 text-sm text-muted" role="status">Loading updates…</p>;
@@ -351,34 +352,42 @@ export function EmployeeCommunityUpdates({
     else onOpenAnnouncement(announcement.id);
   };
 
-  return <div className="mt-1 max-h-[28rem] overflow-y-auto pr-1">
+  const iconFor = (update: (typeof updates)[number]): CommunityFeedIconName => {
+    if (update.kind === "announcement") return "announcement";
+    switch (update.notification.target.type) {
+      case "idea": return "idea";
+      case "learning": return "book";
+      case "feedback": return "announcement";
+      default: return "announcement";
+    }
+  };
+
+  return <div className="mt-[-10px]">
     {announcementsQuery.isError && <p className="mb-3 text-xs text-muted" role="status">Announcements are temporarily unavailable.</p>}
     {notificationsQuery.isError && <p className="mb-3 text-xs text-muted" role="status">Some notifications are temporarily unavailable.</p>}
-    <ul className="divide-y" style={{ borderColor: "var(--line)" }}>
-      {updates.map((update) => {
+    <div className="feed">
+      {updates.map((update, index) => {
         const announcement = update.kind === "announcement" ? update.announcement : null;
-        const notification = update.kind === "announcement" ? update.notification : update.notification;
+        const notification = update.notification;
         const title = announcement?.title ?? notification?.title ?? "Update";
         const body = announcement?.body ?? notification?.body ?? "";
         const date = announcement?.publishedAt ?? notification?.createdAt ?? update.date;
         const unread = Boolean(notification && !notification.isRead);
-        return <li key={announcement ? `announcement-${announcement.id}` : `notification-${notification?.id}`} className="flex items-start gap-3 py-3 first:pt-3 last:pb-1">
-          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${unread ? "bg-blue" : "bg-[var(--line-strong)]"}`} aria-label={unread ? "Unread" : "Read"} />
-          <div className="min-w-0 flex-1">
-            {announcement ? <button type="button" className="block w-full rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue" onClick={() => openPublished(announcement, notification)}>
-              <span className="block text-sm font-medium text-blue">{title}</span>
-              <span className="mt-0.5 block text-sm text-muted">{body}</span>
-              {announcement.pinned && <span className="mt-1 inline-block text-[11px] font-medium text-blue">Pinned</span>}
-            </button> : notification && navigate ? <button type="button" className="block w-full rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue" onClick={() => navigate(notification)}>
-              <span className="block text-sm font-medium text-blue">{title}</span>
-              <span className="mt-0.5 block text-sm text-muted">{body}</span>
-            </button> : <><p className="text-sm font-medium">{title}</p><p className="mt-0.5 text-sm text-muted">{body}</p></>}
-            <time className="mt-1 block text-xs text-muted" dateTime={date}>{new Date(date).toLocaleDateString()}</time>
-          </div>
-          {unread && notification && <Button size="small" disabled={setRead.isPending} onClick={() => setRead.mutate({ id: notification.id, read: true })}>Mark read</Button>}
-        </li>;
+        const content = <>
+          <span className="flex items-center gap-2 text-[14px] font-medium leading-5">
+            {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue" aria-label="Unread" />}
+            {title}
+            {announcement?.pinned && <span className="rounded-full bg-blue/10 px-2 py-0.5 text-[10px] font-medium text-blue">Pinned</span>}
+          </span>
+          <span className="mt-1 block text-[13px] leading-[1.55] text-muted">{body}</span>
+          <time className="mt-1 block text-xs text-muted" dateTime={date}>{new Date(date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</time>
+        </>;
+        const trailing = unread && notification ? <button type="button" aria-label={`Mark ${title} as read`} className="mt-0.5 shrink-0 rounded px-1.5 py-1 text-[11px] font-medium text-blue hover:bg-blue/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue" disabled={setRead.isPending} onClick={() => setRead.mutate({ id: notification.id, read: true })}>Mark read</button> : undefined;
+        return <CommunityFeedRow key={announcement ? `announcement-${announcement.id}` : `notification-${notification?.id}`} icon={iconFor(update)} trailing={trailing} isLast={index === updates.length - 1}>
+          {announcement ? <button type="button" className="block w-full rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue" onClick={() => openPublished(announcement, notification)}>{content}</button> : notification && navigate ? <button type="button" className="block w-full rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue" onClick={() => navigate(notification)}>{content}</button> : content}
+        </CommunityFeedRow>;
       })}
-    </ul>
+    </div>
     {setRead.isError && <p className="mt-3 text-sm text-[#d6336c]" role="alert">{messageFor(setRead.error)}</p>}
   </div>;
 }

@@ -28,6 +28,7 @@ import {
   EmployeeCommunityUpdates,
   EmployeeFeedbackCampaignForm,
 } from "../../employee/employee-engagement";
+import { CommunityFeedRow } from "../../employee/community-feed";
 import type {
   Idea,
   IdeaCreateInput,
@@ -39,7 +40,7 @@ import type {
 } from "../types";
 
 import { useEmployeeProfile } from "../../employee/profile-hooks";
-import { useLearningChallenges, useLearningRankings } from "../../learning/hooks";
+import { useLearningChallenges, useLearningJourney, useLearningRankings } from "../../learning/hooks";
 
 type Page =
   | "community"
@@ -285,6 +286,7 @@ export function EmployeeCommunityPage({
   onNavigate,
   onOpenIdea,
   onOpenAnnouncement,
+  onOpenArticle,
   points = 0,
   levelName = null,
   levelIndex = null,
@@ -294,6 +296,7 @@ export function EmployeeCommunityPage({
   onNavigate: (page: Page) => void;
   onOpenIdea: (id: number) => void;
   onOpenAnnouncement: (id: number) => void;
+  onOpenArticle: (id: number) => void;
   points?: number;
   levelName?: string | null;
   levelIndex?: number | null;
@@ -302,10 +305,15 @@ export function EmployeeCommunityPage({
 }) {
   const profileQuery = useEmployeeProfile();
   const challengesQuery = useLearningChallenges();
+  const journeyQuery = useLearningJourney();
   const rankingsQuery = useLearningRankings("bank");
   const profile = profileQuery.data;
   const rank = rankingsQuery.data?.items.find((item) => item.name === profile?.name && item.department === profile?.department);
   const challenge = challengesQuery.data?.items[0];
+  const recommendedArticle = journeyQuery.data?.recommendedArticles?.[0];
+  const daysUntilChallengeCloses = challenge
+    ? Math.max(0, Math.ceil((Date.parse(challenge.deadlineAt) - Date.now()) / 86_400_000))
+    : null;
   const firstName = profile?.name?.trim().split(/\s+/)[0];
   const [greeting, setGreeting] = useState("Good morning");
   useEffect(() => {
@@ -379,16 +387,30 @@ export function EmployeeCommunityPage({
       <div className="grid items-stretch gap-[18px] min-[900px]:grid-cols-2">
         <section className="app-card">
           <h2 className="text-xl font-semibold">Happening now</h2>
-          <div className="mt-5 divide-y divide-[var(--line)]">
-            <div className="pb-5">
-              <h3 className="font-medium">{challenge?.title ?? "Challenge of the month"}</h3>
-              {challengesQuery.isPending ? <p role="status" className="mt-2 text-sm text-muted">Loading challenges…</p> : challengesQuery.isError ? <p role="alert" className="mt-2 text-sm text-muted">{errorMessage(challengesQuery.error)} <button className="underline" onClick={() => void challengesQuery.refetch()}>Retry</button></p> : challenge ? <><p className="mt-1 text-sm leading-6 text-muted">{challenge.question}</p><p className="mt-2 text-xs text-muted">{challenge.participants} participants · closes {new Date(challenge.deadlineAt).toLocaleDateString()}</p><button className="btn btn-small mt-3" onClick={() => onNavigate("new")}>Share an idea</button></> : <p className="mt-2 text-sm text-muted">No open challenges right now.</p>}
-            </div>
-            <div className="py-5"><h3 className="font-medium">Grow your knowledge</h3><p className="mt-1 text-sm leading-6 text-muted">Find out where you stand and get reading picked for you.</p><button className="btn btn-small mt-3" onClick={() => onNavigate("learn")}>Take a quiz</button></div>
-            <div className="pt-5"><h3 className="font-medium">Season ranking</h3><p className="mt-1 text-sm text-muted">{rank ? `You are ranked ${rank.rank} across the bank.` : rankingsQuery.isPending ? "Loading ranking…" : rankingsQuery.isError ? "Ranking is temporarily unavailable." : "Explore the bank’s innovation champions."}</p><button className="btn btn-small mt-3" onClick={() => onNavigate("learn")}>See the ranking</button></div>
+          <div className="mt-[-10px]">
+            {challenge && <CommunityFeedRow icon="flag">
+              <h3 className="text-[15px] font-medium leading-6">Challenge of the month</h3>
+              <p className="mt-1 text-[13px] leading-[1.6] text-muted">{challenge.question}{daysUntilChallengeCloses ? ` ${daysUntilChallengeCloses} days left.` : ""}</p>
+              <button className="btn btn-small mt-2.5" onClick={() => onNavigate("new")}>Share an idea for it</button>
+            </CommunityFeedRow>}
+            {recommendedArticle ? <CommunityFeedRow icon="book">
+              <h3 className="text-[15px] font-medium leading-6">Recommended for you</h3>
+              <p className="mt-1 text-[13px] leading-[1.6] text-muted">“{recommendedArticle.title}”, {recommendedArticle.readingMinutes} min. {recommendedArticle.recommendation.reason.split(". ")[0]}.</p>
+              <button className="btn btn-small mt-2.5" onClick={() => onOpenArticle(recommendedArticle.id)}>Read it</button>
+            </CommunityFeedRow> : <CommunityFeedRow icon="book">
+              <h3 className="text-[15px] font-medium leading-6">Grow your knowledge</h3>
+              <p className="mt-1 text-[13px] leading-[1.6] text-muted">{journeyQuery.data?.nextRecommendedStep ? `Build your knowledge in ${journeyQuery.data.nextRecommendedStep.topic} and get reading picked for you.` : "Find out where you stand and get reading picked for you."}</p>
+              <button className="btn btn-small mt-2.5" onClick={() => onNavigate("learn")}>Take a quiz</button>
+            </CommunityFeedRow>}
+            <CommunityFeedRow icon="trophy" isLast>
+              <h3 className="text-[15px] font-medium leading-6">Season ranking</h3>
+              <p className="mt-1 text-[13px] leading-[1.6] text-muted">{rank ? <>You are <span className="font-medium text-[var(--text)]">🥇 {ordinal(rank.rank)}</span> across the bank.</> : rankingsQuery.isPending ? "Explore the bank’s innovation champions." : rankingsQuery.isError ? "Ranking is temporarily unavailable." : "Explore the bank’s innovation champions."}</p>
+              <button className="btn btn-small mt-2.5" onClick={() => onNavigate("learn")}>See the ranking</button>
+            </CommunityFeedRow>
+            {challengesQuery.isError && <p role="status" className="mt-3 text-xs text-muted">Challenge information is unavailable. <button className="underline" onClick={() => void challengesQuery.refetch()}>Retry</button></p>}
           </div>
         </section>
-        <section className="app-card flex min-h-[360px] flex-col" aria-label="What’s new"><h2 className="text-xl font-semibold">What’s new</h2><EmployeeCommunityUpdates onOpenAnnouncement={onOpenAnnouncement} /></section>
+        <section className="app-card" aria-label="What’s new"><h2 className="text-xl font-semibold">What’s new</h2><EmployeeCommunityUpdates onOpenAnnouncement={onOpenAnnouncement} /></section>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-semibold">Ideas from across the bank</h2><span className="text-sm text-muted">{ideasQuery.data ? `${ideasQuery.data.total} shared` : "Community ideas"}</span></div>
       <div className="flex flex-wrap items-center gap-3">
