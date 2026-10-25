@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export function PortalBrand({ className = "" }: { className?: string }) {
-  return <div className={`flex items-center gap-2 ${className}`}>
+  return <div className={`flex flex-col items-start gap-0 ${className}`}>
     <svg width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">
       <defs><linearGradient id="portal-flame" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FBBF24" /><stop offset="1" stopColor="#F97316" /></linearGradient></defs>
       <path d="M12.6 2.5c3.6 3.9 6.4 7.2 6.4 11.3a7 7 0 0 1-14 0c0-2.8 1.3-5 3.1-6.7.1 2.4.9 3.7 2.2 3.9 1.3-2.1 2.3-5 2.3-8.5z" fill="url(#portal-flame)" />
@@ -11,7 +11,7 @@ export function PortalBrand({ className = "" }: { className?: string }) {
   </div>;
 }
 
-export const portalSidebarClass = "fixed inset-y-0 left-0 z-50 flex w-[240px] -translate-x-[105%] flex-col gap-6 border-r p-[22px_14px] transition-transform lg:sticky lg:top-0 lg:h-screen lg:w-[240px] lg:translate-x-0 lg:bg-white/60";
+export const portalSidebarClass = "fixed inset-y-0 left-0 z-50 flex w-[240px] -translate-x-[105%] flex-col gap-6 border-r bg-[var(--bg)] p-[22px_14px] transition-transform lg:sticky lg:top-0 lg:h-screen lg:w-[240px] lg:translate-x-0 lg:bg-[var(--bg)]";
 export const portalNavigationClass = "flex flex-col gap-0.5";
 export const portalNavigationItemClass = "relative flex items-center gap-3 rounded-[10px] px-3 py-3 text-left font-normal transition";
 export const portalHeaderClass = "sticky top-0 z-30 flex min-h-16 items-center gap-2 border-b bg-white/75 px-3 py-3 backdrop-blur-md sm:px-7";

@@ -91,7 +91,7 @@ export function EmployeeFeedbackCampaignForm({ appearance = "default" }: { appea
     }
   }
   if (community) return (
-    <section className="pinned-surface relative overflow-hidden rounded-[20px] px-6 py-7 text-white shadow-[0_18px_36px_-18px_var(--blue-deep)] sm:px-8" aria-label="Feedback campaign">
+    <section className="pinned-surface relative overflow-hidden rounded-[20px] px-6 py-7 text-white shadow-[0_18px_36px_-18px_var(--blue-deep)] sm:px-6" aria-label="Feedback campaign">
       <span className="pointer-events-none absolute right-[36px] top-[8px] h-[96px] w-[96px] rounded-full bg-white/[.12]" aria-hidden="true" />
       <span className="pointer-events-none absolute right-[132px] top-[64px] h-[54px] w-[54px] rounded-full bg-white/[.11]" aria-hidden="true" />
       <span className="pointer-events-none absolute right-[10px] top-[84px] h-[42px] w-[42px] rounded-full bg-white/[.11]" aria-hidden="true" />
