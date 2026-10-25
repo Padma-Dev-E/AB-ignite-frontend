@@ -20,7 +20,7 @@ export function FirstLoginPasswordChange({ onChangePassword }: { onChangePasswor
     const parsed = passwordInput.safeParse({ currentPassword, newPassword });
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
-      setError(issue?.message === "Invalid input" || issue?.path[0] === "newPassword" ? `${passwordPolicyHint} Choose a password different from your current password.` : "Enter your current password.");
+      setError(issue?.code === "too_big" ? "Passwords can be up to 1,024 characters." : issue?.message === "Invalid input" || issue?.path[0] === "newPassword" ? `${passwordPolicyHint} Choose a password different from your current password.` : "Enter your current password.");
       return;
     }
 
@@ -41,9 +41,9 @@ export function FirstLoginPasswordChange({ onChangePassword }: { onChangePasswor
         <h1 className="text-[28px] font-medium tracking-[-.02em]">Change your password</h1>
         <p className="mt-1 text-sm leading-6 text-muted">Set a new password to continue. You’ll be asked to sign in again after it is changed.</p>
         <form className="mt-5 space-y-3" onSubmit={submit}>
-          <label className="block"><span className="field-label">Current password</span><input className="input" type="password" autoComplete="current-password" required maxLength={1024} value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} disabled={pending} /></label>
-          <label className="block"><span className="field-label">New password</span><input className="input" type="password" autoComplete="new-password" aria-describedby="first-password-policy" required minLength={10} maxLength={128} value={newPassword} onChange={event => setNewPassword(event.target.value)} disabled={pending} /></label>
-          <label className="block"><span className="field-label">Confirm new password</span><input className="input" type="password" autoComplete="new-password" required maxLength={128} value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} disabled={pending} /></label>
+          <label className="block"><span className="field-label">Current password</span><input className="input" type="password" autoComplete="current-password" required value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} disabled={pending} /></label>
+          <label className="block"><span className="field-label">New password</span><input className="input" type="password" autoComplete="new-password" aria-describedby="first-password-policy" required minLength={10} value={newPassword} onChange={event => setNewPassword(event.target.value)} disabled={pending} /></label>
+          <label className="block"><span className="field-label">Confirm new password</span><input className="input" type="password" autoComplete="new-password" required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} disabled={pending} /></label>
           <p id="first-password-policy" className="text-sm text-muted">{passwordPolicyHint}</p>
           {error && <p className="text-[13.5px] font-medium text-[#c22b45]" role="alert">{error}</p>}
           <Button type="submit" variant="primary" className="w-full" disabled={pending}>{pending ? "Saving password…" : "Change password"}</Button>
