@@ -956,12 +956,12 @@ function Hero({
   children?: React.ReactNode;
 }) {
   return (
-    <section className="hero-surface relative overflow-hidden rounded-[24px] px-5 py-6 text-white sm:px-9 sm:py-[48px]">
+    <section className="hero-surface relative overflow-hidden rounded-[24px] px-5 py-6 text-white sm:px-7 sm:py-[29.5px]">
       <div className="relative z-10 max-w-[62%] sm:max-w-[65%]">
-        <h1 className="text-[25px] font-medium leading-tight tracking-[-.02em] sm:text-[40px]">
-          {title}
+        <h1 className="text-[25px] font-medium leading-tight tracking-[-.02em] sm:text-[32px] sm:leading-[1.22]">
+          {title === "Ignite Your Knowledge ⚡" ? <>Ignite Your Knowledge <span className="text-[#ffd43b]">⚡</span></> : title}
         </h1>
-        <p className="mt-1.5 text-sm leading-6 text-white/85 sm:text-[18px]">
+        <p className="mt-1.5 text-sm leading-6 text-white/85 sm:text-[15px]">
           {subtitle}
         </p>
         {children}
@@ -1007,9 +1007,7 @@ function Hero({
             width="250"
             height="140"
             viewBox="0 0 250 140"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="5"
+            fill="currentColor"
           >
             <rect x="34" y="84" width="60" height="56" rx="6" />
             <rect x="100" y="50" width="60" height="90" rx="6" />
@@ -1765,8 +1763,9 @@ function LegacyAccountPage({
   );
 }
 
-function LiveLearnPage({ onArticle, relatedQuizId = null }: { onArticle: (id: number) => void; relatedQuizId?: number | null }) {
+function LiveLearnPage({ onArticle, relatedQuizId = null, onShareIdea }: { onArticle: (id: number) => void; relatedQuizId?: number | null; onShareIdea?: (challengeId?: number) => void }) {
   const [tab, setTab] = useState(relatedQuizId ? "Quizzes" : "My journey");
+  const [quizFullscreen, setQuizFullscreen] = useState(false);
   const [selectedRelatedQuizId, setSelectedRelatedQuizId] = useState<number | null>(relatedQuizId);
   const [pendingQuizArticleId, setPendingQuizArticleId] = useState<number | undefined>();
   const [articleErrors, setArticleErrors] = useState<Record<number, string>>({});
@@ -1810,16 +1809,18 @@ function LiveLearnPage({ onArticle, relatedQuizId = null }: { onArticle: (id: nu
       : ("success" as const);
   return (
     <div className="stack">
-      <Hero
-        art="arena"
-        title="Ignite Your Knowledge ⚡"
-        subtitle="Challenge yourself, learn from your gaps and watch your skills grow."
-      />
-      <Tabs
-        items={["My journey", "Quizzes", "Ranking", "Challenges"]}
-        active={tab}
-        onChange={setTab}
-      />
+      {!quizFullscreen && <>
+        <Hero
+          art="arena"
+          title="Ignite Your Knowledge ⚡"
+          subtitle="Challenge yourself, learn from your gaps and watch your skills grow."
+        />
+        <Tabs
+          items={["My journey", "Quizzes", "Ranking", "Challenges"]}
+          active={tab}
+          onChange={setTab}
+        />
+      </>}
       {tab === "My journey" && (
         <>
           {journey.data ? (
@@ -1854,9 +1855,9 @@ function LiveLearnPage({ onArticle, relatedQuizId = null }: { onArticle: (id: nu
           </button>
         </>
       )}
-      {tab === "Quizzes" && <QuizJourney relatedQuizId={selectedRelatedQuizId} />}
+      {tab === "Quizzes" && <QuizJourney relatedQuizId={selectedRelatedQuizId} onFullscreenChange={setQuizFullscreen} onOpenJourney={() => setTab("My journey")} onReadArticle={onArticle} />}
       {tab === "Ranking" && <LearningRanking />}
-      {tab === "Challenges" && <LearningChallenges />}
+      {tab === "Challenges" && <LearningChallenges onShareIdea={onShareIdea} />}
     </div>
   );
 }
@@ -2134,6 +2135,24 @@ export default function Home(props: unknown) {
   const setNotificationRead = useSetEmployeeNotificationRead();
 
   useEffect(() => {
+    const updateScrollbarGutter = () => {
+      document.documentElement.dataset.hasVerticalScroll = String(document.documentElement.scrollHeight > window.innerHeight);
+    };
+    updateScrollbarGutter();
+    const resizeObserver = new ResizeObserver(updateScrollbarGutter);
+    resizeObserver.observe(document.body);
+    const mutationObserver = new MutationObserver(updateScrollbarGutter);
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", updateScrollbarGutter);
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      window.removeEventListener("resize", updateScrollbarGutter);
+      delete document.documentElement.dataset.hasVerticalScroll;
+    };
+  }, []);
+
+  useEffect(() => {
     if (protectedView) setSignedIn(true);
   }, [protectedView]);
   useEffect(() => {
@@ -2225,7 +2244,7 @@ export default function Home(props: unknown) {
     ) : page === "new" ? (
       <EmployeeIdeaSubmissionPage onOpenIdea={openIdea} />
     ) : page === "learn" ? (
-      <LiveLearnPage key="learn" onArticle={(id) => { setSelectedArticleId(id); navigate("article"); }} />
+      <LiveLearnPage key="learn" onArticle={(id) => { setSelectedArticleId(id); navigate("article"); }} onShareIdea={() => navigate("new")} />
     ) : page === "library" ? (
       <LiveLibraryPage
         onArticle={(id) => {
@@ -2255,7 +2274,7 @@ export default function Home(props: unknown) {
     ) : page === "me" ? (
       <AccountPage onNavigate={navigate} />
     ) : page === "quiz" ? (
-      <LiveLearnPage key={`related-quiz-${selectedRelatedQuizId ?? "all"}`} relatedQuizId={selectedRelatedQuizId} onArticle={(id) => { setSelectedArticleId(id); navigate("article"); }} />
+      <LiveLearnPage key={`related-quiz-${selectedRelatedQuizId ?? "all"}`} relatedQuizId={selectedRelatedQuizId} onArticle={(id) => { setSelectedArticleId(id); navigate("article"); }} onShareIdea={() => navigate("new")} />
     ) : (
       <EmployeeCommunityPage
         points={points}
@@ -2295,7 +2314,7 @@ export default function Home(props: unknown) {
             displayName={profileQuery.data?.name}
           />
           <NotificationNavigationProvider onOpen={openNotification}>
-            <main ref={mainRef} tabIndex={-1} className="mx-auto w-full max-w-[1040px] px-3.5 pb-28 pt-7 outline-none sm:px-7 sm:pb-[70px]">
+            <main ref={mainRef} tabIndex={-1} className="mx-auto w-full max-w-[1040px] px-3.5 pb-28 pt-[30px] outline-none sm:px-7 sm:pb-[70px]">
               {pageContent}
             </main>
           </NotificationNavigationProvider>

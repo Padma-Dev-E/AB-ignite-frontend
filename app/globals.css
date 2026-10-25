@@ -25,7 +25,8 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; scrollbar-gutter: auto; }
+html[data-has-vertical-scroll="true"] { scrollbar-gutter: stable; }
 body {
   min-height: 100vh;
   margin: 0;

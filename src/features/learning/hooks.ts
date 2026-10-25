@@ -42,7 +42,7 @@ export function useStartQuizAttempt() {
 export function useSubmitQuizAttempt() {
   const client = useQueryClient();
   return useMutation({ mutationFn: ({ attemptId, answers }: { attemptId: number; answers: QuizAnswer[] }) => submitQuizAttempt(attemptId, answers), onSuccess: (data, variables) => {
-    client.setQueryData<import("./types").AttemptResponse>(learningQueryKeys.attempt(variables.attemptId), (current) => current ? { ...current, attempt: { ...current.attempt, status: data.result.status }, result: data.result } : current);
+    client.setQueryData<import("./types").AttemptResponse>(learningQueryKeys.attempt(variables.attemptId), (current) => current ? { ...current, attempt: { ...current.attempt, status: data.result.status }, result: data.result, topics: data.topics, answerReview: data.answerReview } : current);
     void client.invalidateQueries({ queryKey: learningQueryKeys.attempt(variables.attemptId) });
     void client.invalidateQueries({ queryKey: learningQueryKeys.journey() });
     void refreshPointsSummary(client);

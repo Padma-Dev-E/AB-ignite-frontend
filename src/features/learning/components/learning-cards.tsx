@@ -7,8 +7,8 @@ import type { LearningArticle, LearningJourney, QuizSummary } from "../types";
 import { useArticleInsight } from "../hooks";
 
 type State = "loading" | "error" | "empty" | "success";
-const panelClass = "rounded-xl border border-slate-200 bg-white p-5 shadow-sm";
-const buttonClass = "inline-flex min-h-10 items-center justify-center rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700 disabled:cursor-not-allowed disabled:opacity-50";
+const panelClass = "rounded-[20px] border border-[var(--line)] bg-white p-6 shadow-[0_1px_2px_rgba(11,40,100,0.05),0_10px_26px_-14px_rgba(11,40,100,0.2)]";
+const buttonClass = "btn btn-primary min-h-10 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function LearningState({ state, label, onRetry, children }: { state: State; label?: string; onRetry?: () => void; children?: ReactNode }) {
   if (state === "success") return <>{children}</>;
@@ -53,13 +53,15 @@ function topicName(topic: string) {
 }
 
 function JourneyCategory({ category }: { category: LearningJourney["categories"][number] }) {
+  const assessed = category.totalQuestions > 0;
   const score = Math.max(0, Math.min(100, category.scorePercent));
-  return <li className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-5 text-center">
-    <div className="relative grid size-28 place-items-center rounded-full" style={{ background: `conic-gradient(#e87900 ${score * 3.6}deg, #cbd5e1 0deg)` }} role="img" aria-label={`${categoryName(category.categoryCode)} ${score}%`}>
-      <div className="grid size-24 place-items-center rounded-full bg-white text-2xl font-bold text-blue-950">{score}%</div>
+  const color = !assessed ? "var(--line-strong)" : score >= 80 ? "var(--teal)" : score >= 60 ? "var(--blue)" : "var(--sand)";
+  return <li className="rounded-xl border border-[var(--line)] px-3.5 py-3 text-center">
+    <div className="relative mx-auto grid size-[84px] place-items-center rounded-full" style={{ background: `conic-gradient(${color} ${score * 3.6}deg, var(--line) 0deg)` }} role="img" aria-label={`${categoryName(category.categoryCode)} ${assessed ? `${score}%` : "not assessed"}`}>
+      <div className="grid size-[68px] place-items-center rounded-full bg-white text-lg font-medium text-[var(--text)]">{assessed ? `${score}%` : "–"}</div>
     </div>
-    <h3 className="mt-4 max-w-64 text-base font-semibold leading-6 text-blue-950">{categoryName(category.categoryCode)}</h3>
-    <p className="mt-1 text-sm text-slate-500">{category.totalQuestions ? `${category.totalQuestions} questions across ${category.quizCount ?? 1} ${(category.quizCount ?? 1) === 1 ? "quiz" : "quizzes"} · ${category.totalQuestions < 3 ? "limited" : "moderate"} evidence` : "Not assessed yet"}</p>
+    <h3 className="mt-1.5 text-sm font-medium leading-5 text-[var(--text)]">{categoryName(category.categoryCode)}</h3>
+    <p className="mt-0.5 text-xs text-[var(--muted)]">{assessed ? `${category.totalQuestions} questions over ${category.quizCount ?? 1} ${(category.quizCount ?? 1) === 1 ? "quiz" : "quizzes"} · ${category.totalQuestions < 3 ? "limited" : "moderate"} evidence` : "Not assessed yet"}</p>
   </li>;
 }
 
@@ -72,41 +74,40 @@ export function JourneyCard({ journey, onReadArticle, onCompleteArticle, onRetak
   const recent = journey.recentQuizzes ?? [];
   const categoryOrder = ["banking", "transformation", "technology"];
   const categories = [...journey.categories].sort((a, b) => categoryOrder.indexOf(a.categoryCode) - categoryOrder.indexOf(b.categoryCode));
-  return <div className="space-y-8">
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="learning-journey-title">
-      <div className="flex flex-wrap items-center justify-between gap-3"><h2 id="learning-journey-title" className="text-2xl font-bold text-blue-950">Your Personal Learning Journey</h2><span className="font-semibold text-blue-950" aria-label={`${journey.streakDays ?? 0} day streak`}>💡 {journey.streakDays ?? 0} day streak</span></div>
-      <p className="mt-4 max-w-5xl text-base leading-7 text-slate-700">{journey.topics.length ? `Your latest results highlight ${journey.topics.slice(0, 2).map((topic) => topicName(topic.topic)).join(" and ")} as areas to build on. Keep reading and retaking quizzes to strengthen your knowledge.` : "Complete a quiz to start building your personal learning journey and get recommendations for your next steps."}</p>
-      <p className="mt-2 text-sm text-slate-500">A quiz score is a pointer, not a verdict on your competence.</p>
-      {journey.nextRecommendedStep && <div className="mt-5 rounded-2xl border border-slate-200 p-5"><p className="text-base leading-7 text-slate-700"><strong className="text-blue-950">Next step:</strong> {journey.nextRecommendedArticle?.title ?? topicName(journey.nextRecommendedStep.topic)} <span className="text-slate-500">{journey.nextRecommendedStep.reason}</span></p>{nextArticleId && onReadArticle && <button type="button" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-blue-600 px-5 font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" onClick={() => onReadArticle(nextArticleId)}>Read it</button>}</div>}
+  return <div className="space-y-[26px]">
+    <section className={panelClass} aria-labelledby="learning-journey-title">
+      <div className="flex flex-wrap items-center justify-between gap-3"><h2 id="learning-journey-title" className="text-xl font-semibold tracking-[-.015em] text-[var(--text)]">Your Personal Learning Journey</h2><span className="inline-flex items-center gap-2 font-medium text-[var(--text)]" aria-label={`${journey.streakDays ?? 0} day streak`}><span aria-hidden="true">💡</span>{journey.streakDays ?? 0} day{journey.streakDays === 1 ? "" : "s"} streak</span></div>
+      <div className="mt-3 flex items-start gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-[11px] bg-[color-mix(in_srgb,var(--violet)_14%,transparent)] text-[var(--violet)]"><svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="7" width="14" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/></svg></span><div className="min-w-0"><p className="text-[15px] leading-6 text-[var(--text)]">{journey.topics.length ? `Your latest results show ${journey.topics.slice(0, 2).map((topic) => topicName(topic.topic)).join(" and ")} as areas to build on. Keep reading and retaking quizzes to strengthen your knowledge.` : "Complete a quiz to start building your personal learning journey and get recommendations for your next steps."}</p><p className="mt-1.5 text-xs text-[var(--muted)]">Explained by AI from your topic-level results and history. A quiz score is a pointer, not a verdict on your competence.</p></div></div>
+      {journey.nextRecommendedStep && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--line)] px-3.5 py-3"><p className="text-sm leading-6 text-[var(--text)]"><strong className="font-medium">Next step:</strong> {journey.nextRecommendedArticle?.title ?? topicName(journey.nextRecommendedStep.topic)} <span className="text-[var(--muted)]">{journey.nextRecommendedStep.reason}</span></p>{nextArticleId && onReadArticle && <button type="button" className={`${buttonClass} btn-small shrink-0`} onClick={() => onReadArticle(nextArticleId)}>Read it</button>}</div>}
       {!journey.nextRecommendedStep && journey.topics.length === 0 && <p className="mt-5 rounded-xl border border-slate-200 p-4 text-slate-600">Your recommendations will appear here after your first quiz.</p>}
-      {!!categories.length && <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{categories.map((category) => <JourneyCategory key={category.categoryCode} category={category} />)}</ul>}
+      {!!categories.length && <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{categories.map((category) => <JourneyCategory key={category.categoryCode} category={category} />)}</ul>}
     </section>
 
     <section aria-labelledby="recommended-reading-title">
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h2 id="recommended-reading-title" className="text-2xl font-bold text-blue-950">Recommended reading</h2><span className="text-sm text-slate-500">{articles.length} open</span></div>
-      {articles.length ? <ul className="grid gap-5 md:grid-cols-2">{articles.map((article) => {
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2"><h2 id="recommended-reading-title" className="text-xl font-semibold tracking-[-.015em] text-[var(--text)]">Recommended reading</h2><span className="text-sm text-[var(--muted)]">{articles.length} open</span></div>
+      {articles.length ? <ul className="grid gap-[18px] md:grid-cols-2">{articles.map((article) => {
         const recommendationArticle = article as typeof article & { relatedQuizId?: number | null; completed?: boolean };
         const completed = recommendationArticle.completed || completedArticleIds.includes(article.id) || alreadyCompletedArticleIds.includes(article.id);
         const saving = pendingArticleId === article.id;
         const openingQuiz = pendingQuizArticleId === article.id;
-        return <li key={`${article.id}-${article.recommendation.id}`}><article className="h-full rounded-3xl border border-slate-200 border-l-4 border-l-orange-500 bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex flex-wrap items-center justify-between gap-3"><span className="rounded-full border border-orange-300 px-4 py-1.5 text-sm font-semibold text-orange-700">✧ Recommended for you</span><time className="text-sm text-slate-500">{article.recommendation.createdAt ? new Date(article.recommendation.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : ""}</time></div>
-          <h3 className="mt-4 text-xl font-bold leading-snug text-blue-950">{article.title}</h3>
-          <div className="mt-4 rounded-xl border border-dashed border-orange-300 p-4 text-sm leading-6 text-slate-600"><strong className="text-orange-600">▣ </strong>{article.recommendation.reason}</div>
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-500"><span className="rounded-full border border-slate-300 px-3 py-1 font-semibold">{categoryName(article.category)}</span><span className="rounded-full border border-slate-300 px-3 py-1 font-semibold capitalize">{article.difficulty}</span><span aria-label={`${article.readingMinutes} minute read`}>▯ {article.readingMinutes} min</span></div>
-          {article.summary && <p className="mt-4 text-sm leading-6 text-slate-600">{article.summary}</p>}
-          <div className="mt-5 flex flex-wrap gap-2">
-            {onReadArticle && <button type="button" className="inline-flex min-h-11 items-center rounded-xl bg-blue-600 px-5 font-semibold text-white hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" onClick={() => onReadArticle(article.id)}>Read</button>}
-            {onCompleteArticle && <button type="button" className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 px-4 font-semibold text-blue-950 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={saving || completed} onClick={() => onCompleteArticle(article.id)}>{saving ? "Saving…" : completed ? "✓ Completed" : "✓ Mark as completed"}</button>}
-            {onRetakeRelatedQuiz && <button type="button" className="inline-flex min-h-11 items-center rounded-xl border border-blue-200 px-4 font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50" disabled={openingQuiz} onClick={() => onRetakeRelatedQuiz(article.id, recommendationArticle.relatedQuizId ?? null)}>{openingQuiz ? "Opening quiz…" : "ϟ Retake a related quiz"}</button>}
+        return <li key={`${article.id}-${article.recommendation.id}`}><article className="h-full rounded-[20px] border border-[var(--line)] border-l-[3px] border-l-[var(--sand)] bg-white p-6 shadow-[0_1px_2px_rgba(11,40,100,0.05),0_10px_26px_-14px_rgba(11,40,100,0.2)]">
+          <div className="flex flex-wrap items-center justify-between gap-3"><span className="pill" style={{ color: "var(--sand)", borderColor: "color-mix(in srgb,var(--sand) 50%,transparent)" }}>✧ Recommended for you</span><time className="text-xs text-[var(--muted)]">{article.recommendation.createdAt ? new Date(article.recommendation.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""}</time></div>
+          <h3 className="mt-3 text-base font-semibold leading-snug text-[var(--text)]">{article.title}</h3>
+          <div className="mt-3 rounded-xl border border-dashed border-[color-mix(in_srgb,var(--sand)_45%,transparent)] px-3 py-2.5 text-[13.5px] leading-5 text-[var(--muted)]"><strong className="mr-1 text-[var(--sand)]">✧</strong>{article.recommendation.reason}</div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]"><span className="pill">{categoryName(article.category)}</span><span className="pill">{article.difficulty}</span><span>{article.readingMinutes} min</span></div>
+          {article.summary && <p className="mt-3 text-sm leading-5 text-[var(--muted)]">{article.summary}</p>}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {onReadArticle && <button type="button" className={`${buttonClass} btn-small`} onClick={() => onReadArticle(article.id)}>Read</button>}
+            {onCompleteArticle && <button type="button" className="btn btn-small" disabled={saving || completed} onClick={() => onCompleteArticle(article.id)}>{saving ? "Saving…" : completed ? "✓ Completed" : "✓ Mark as completed"}</button>}
+            {onRetakeRelatedQuiz && <button type="button" className="btn btn-small" disabled={openingQuiz} onClick={() => onRetakeRelatedQuiz(article.id, recommendationArticle.relatedQuizId ?? null)}>{openingQuiz ? "Opening quiz…" : "⚡ Retake a related quiz"}</button>}
           </div>
           {articleErrors[article.id] && <p className="mt-3 text-sm font-medium text-red-700" role="alert">{articleErrors[article.id]}</p>}
         </article></li>;
       })}</ul> : <LearningState state="empty" label="No recommended reading yet. Complete a quiz to get suggestions for your topic gaps." />}
     </section>
 
-    <div className="grid gap-5 lg:grid-cols-2">
-      <section className={panelClass} aria-labelledby="topic-standings-title"><h2 id="topic-standings-title" className="text-2xl font-bold text-blue-950">Where you stand by topic</h2><p className="mt-1 text-sm text-slate-500">From your latest attempt of each quiz, weighted by question difficulty.</p>{journey.topics.length ? <ul className="mt-4 divide-y divide-slate-200">{journey.topics.map((topic) => { const score = Math.max(0, Math.min(100, topic.scorePercent)); return <li key={`${topic.categoryCode}-${topic.topic}`} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="min-w-0 flex-1"><h3 className="font-semibold text-blue-950">{topicName(topic.topic)}</h3><p className="text-sm text-slate-500">{categoryName(topic.categoryCode)} · {topic.totalQuestions ?? 0} q · {topic.levels?.join(", ") || "Foundation"} · {topic.limitedEvidence ? "limited" : "moderate"} evidence</p></div><div className="flex min-w-32 items-center gap-3"><div className="h-2 flex-1 rounded-full bg-indigo-100"><div className={`h-2 rounded-full ${score >= 70 ? "bg-emerald-600" : "bg-indigo-500"}`} role="progressbar" aria-label={`${topic.topic} score`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={score} style={{ width: `${score}%` }} /></div><strong className="w-12 text-right text-blue-950">{score}%</strong></div></li>; })}</ul> : <p className="mt-6 text-sm text-slate-500">Quiz topic results will appear here.</p>}</section>
+    <div className="grid gap-[18px] lg:grid-cols-2">
+      <section className={panelClass} aria-labelledby="topic-standings-title"><h2 id="topic-standings-title" className="text-xl font-semibold text-[var(--text)]">Where you stand by topic</h2><p className="mt-1 text-sm text-[var(--muted)]">From your latest attempt of each quiz, weighted by question difficulty.</p>{journey.topics.length ? <ul className="mt-2 divide-y divide-[var(--line)]">{journey.topics.map((topic) => { const score = Math.max(0, Math.min(100, topic.scorePercent)); const color = score >= 80 ? "var(--teal)" : score >= 60 ? "var(--blue)" : "var(--sand)"; return <li key={`${topic.categoryCode}-${topic.topic}`} className="grid grid-cols-[minmax(0,1fr)_110px_48px] items-center gap-2.5 py-2 text-sm max-[620px]:grid-cols-[minmax(0,1fr)_72px_42px]"><div className="min-w-0"><h3 className="font-medium text-[var(--text)]">{topicName(topic.topic)}</h3><p className="text-xs text-[var(--muted)]">{categoryName(topic.categoryCode)} · {topic.totalQuestions ?? 0} q · {topic.levels?.join(", ") || "Foundation"} · {topic.limitedEvidence ? "limited" : "moderate"} evidence</p></div><div className="h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--blue)_14%,transparent)]"><div className="h-full rounded-full" role="progressbar" aria-label={`${topic.topic} score`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={score} style={{ width: `${score}%`, background: color }} /></div><strong className="text-right text-sm font-medium tabular-nums text-[var(--text)]">{score}%</strong></li>; })}</ul> : <p className="mt-6 text-sm text-[var(--muted)]">Take a quiz to see your topic profile.</p>}</section>
       <section className={`${panelClass} min-h-72`} aria-labelledby="improvement-title"><h2 id="improvement-title" className="text-2xl font-bold text-blue-950">Improvement over time</h2><p className="mt-1 text-sm text-slate-500">First versus latest score on quizzes you retook.</p>{improvement.length ? <ul className="mt-4 space-y-4">{improvement.map((item) => <li key={item.topic}><div className="flex justify-between gap-3 text-sm font-semibold"><span>{item.topic}</span><span>{item.firstScorePercent}% → {item.latestScorePercent}%</span></div><p className="mt-1 text-xs text-slate-500">{item.attempts} attempts</p></li>)}</ul> : <p className="mt-10 text-center text-base leading-7 text-slate-500">Read a recommended article, then retake the related quiz to measure your improvement.</p>}</section>
     </div>
 
