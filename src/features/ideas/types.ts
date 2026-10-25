@@ -1,0 +1,65 @@
+export type IdeaStatus = "draft" | "screening" | "returned" | "business_review" | "control_review" | "decision" | "poc" | "implementation" | "implemented" | "rejected" | "deferred";
+export type IdeaKind = "idea" | "problem";
+
+export type Idea = {
+  id: number;
+  authorId: number;
+  author?: { id: number; name: string; department: string } | null;
+  supported?: boolean;
+  kind: IdeaKind;
+  title: string;
+  summary: string;
+  problem: string | null;
+  solution: string | null;
+  benefits: string | null;
+  risks: string | null;
+  category: string;
+  status: IdeaStatus;
+  priorityBand: "Watch" | "Quality" | "Priority" | null;
+  priorityScore: number | null;
+  reference: string;
+  challengeId: number | null;
+  buildsOnId: number | null;
+  supports: number;
+  comments: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type IdeaListParams = { page?: number; pageSize?: number; search?: string; category?: string; status?: IdeaStatus; mine?: boolean };
+export type IdeaListResponse = { items: Idea[]; page: number; pageSize: number; total: number; totalPages: number };
+export type IdeaCreateInput = {
+  kind: IdeaKind;
+  title: string;
+  summary: string;
+  problem?: string;
+  solution?: string;
+  benefits?: string;
+  risks?: string;
+  category: string;
+  dataClassification?: "public" | "internal" | "confidential" | "restricted";
+  answers?: IdeaSubmissionAnswers;
+  metrics?: IdeaSubmissionMetrics;
+  buildsOnId?: number;
+  differentiation?: string;
+};
+export type IdeaCreateResponse = { idea: Idea; versionId: number };
+export type IdeaPriorityBreakdown = { key: "turnaround" | "volume" | "value"; score: number; weight: number; contribution: number };
+export type IdeaPriorityPolicy = {
+  kpis: Array<{ key: "turnaround" | "volume" | "value"; question: string; hint: string; weight: number }>;
+  bands: Array<{ name: "Watch" | "Quality" | "Priority"; minimum: number }>;
+  minimumScore: number;
+};
+export type IdeaSubmitResponse = { ideaId: number; versionId: number; runId?: number | null; status: string; submitted?: boolean; reference?: string; minimumScore?: number; confirmation?: string; score?: number; priorityBand?: "Watch" | "Quality" | "Priority"; category?: string; breakdown?: IdeaPriorityBreakdown[]; pointsAwarded?: number; aiValidationScore?: number | null; aiValidationAttempts?: number; submittedWithLowAiScore?: boolean };
+export type IdeaAiStatusResponse = { idea: Pick<Idea, "id" | "status" | "reference">; runs: Array<{ id: number; jobKey: string; status: string; attemptCount: number; createdAt: string; updatedAt: string; completedAt: string | null }>; events: Array<{ id: number; eventType: string; createdAt: string }>; reviews: unknown[] };
+export type IdeaEnrichment = { suggestedTitle: string; conciseSummary: string; problemStatement: string; solutionStatement?: string; riskStatement?: string; valueStatement: string; tags: string[]; taxonomy: string[]; affectedTeams: string[]; assumptions: string[] };
+export type IdeaValidation = { decision: string; confidence: number; overallScore: number; strengths: string[]; gaps: string[]; assumptions: string[]; questions: Array<{ question: string; reason: string }>; risks: Array<{ severity: string; description: string }>; nextActions: Array<{ action: string; ownerRole: string }> };
+export type IdeaDevelopmentRun = { id: number; jobKey: "idea.enrich" | "idea.validate"; status: string; ideaVersionId: number; result: IdeaEnrichment | IdeaValidation | null; createdAt: string; completedAt: string | null };
+export type IdeaSubmissionAnswers = { beneficiaries: string; currentProcess: string; needed: string; risks: string; successMeasure: string };
+export type IdeaSubmissionMetrics = { turnaround: number; volume: number; value: number; turnaroundExplanation?: string; volumeExplanation?: string; valueExplanation?: string };
+export type IdeaSubmissionInput = { answers: IdeaSubmissionAnswers; metrics: IdeaSubmissionMetrics; buildsOnId?: number; differentiation?: string };
+export type IdeaComment = { id: number; ideaId: number; authorId: number; body: string; createdAt: string; updatedAt: string; author: { id: number; name: string; department: string } | null };
+export type CommentListResponse = { items: IdeaComment[]; page: number; pageSize: number; total: number; totalPages: number };
+export type IdeaUpdateInput = Partial<Pick<Idea, "kind" | "title" | "summary" | "problem" | "solution" | "benefits" | "risks" | "category">> & { dataClassification?: "public" | "internal" | "confidential" | "restricted" };
+export type IdeaDetailResponse = { idea: Idea; comments: CommentListResponse; submission?: { answers: IdeaSubmissionAnswers; metrics: IdeaSubmissionMetrics; score: number; minimumScore: number; validationPassed: boolean; differentiation: string | null } | null };
+export type SupportResponse = { supported: boolean; supports: number };

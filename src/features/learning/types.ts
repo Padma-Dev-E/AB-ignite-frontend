@@ -1,0 +1,26 @@
+export type QuizSummary = { id: number; title: string; category: string; level: string; objective: string; passMark: number; timeLimitSeconds: number | null; version: number; questionCount: number; hasAttempted?: boolean };
+export type QuizOption = { id: number; optionKey: string; label: string; sortOrder: number };
+export type QuizQuestion = { id: number; topic: string | null; prompt: string; sortOrder: number; points: number; options: QuizOption[] };
+export type QuizAttempt = { id: number; quizId: number; quizVersionId: number; status: string; startedAt: string; expiresAt: string | null; totalQuestions: number; questions: QuizQuestion[] };
+export type QuizResult = { attemptId: number; status: string; scorePercent: number; passed: boolean; passMark: number; correctCount: number; totalQuestions: number; pointsAwarded: number; firstAttempt: boolean; previousScorePercent: number | null; pointsStatus: string; submittedAt: string | null };
+export type QuizAnswer = { questionId: number; optionKey: string };
+export type QuizRecommendation = { id: number; topic: string; categoryCode: string; scorePercent: number; thresholdPercent: number; reason: string; status?: string; createdAt?: string };
+export type LearningJourney = {
+  topics: Array<{ topic: string; categoryCode: string; scorePercent: number; correctCount?: number; totalQuestions?: number; quizCount?: number; levels?: string[]; quizTitles?: string[]; limitedEvidence?: boolean; trend: number[]; improvement?: { firstScorePercent: number; latestScorePercent: number; attempts: number } | null }>;
+  categories: Array<{ categoryCode: string; scorePercent: number; correctCount: number; totalQuestions: number; quizCount?: number }>;
+  recommendations: QuizRecommendation[];
+  nextRecommendedStep: QuizRecommendation | null;
+  nextRecommendedArticle?: { id: number; title: string; relatedQuizId?: number | null } | null;
+  recommendedArticles?: Array<Pick<LearningArticle, "id" | "title" | "summary" | "category" | "topic" | "difficulty" | "readingMinutes" | "contentType" | "sourceUrl" | "relatedQuizId"> & { body?: string | null; recommendation: QuizRecommendation }>;
+  improvement?: Array<{ topic: string; firstScorePercent: number; latestScorePercent: number; attempts: number }>;
+  recentQuizzes?: Array<{ attemptId: number; quizId: number; title: string; categoryCode: string; level: string; scorePercent: number; passed: boolean; status: string; submittedAt: string | Date | null; correctCount: number; totalQuestions: number }>;
+  streakDays?: number;
+};
+export type LearningArticle = { id: number; publisher: string; title: string; summary: string; category: string; topic: string | null; difficulty: string; readingMinutes: number; contentType: string; body: string | null; sourceUrl: string | null; completed?: boolean; relatedQuizId?: number | null; recommendation?: Pick<QuizRecommendation, "id" | "topic" | "scorePercent" | "thresholdPercent" | "reason"> };
+export type ArticleListResponse = { items: LearningArticle[]; emptyMessage?: string | null };
+export type ArticleCompletion = { completionId: number; alreadyCompleted?: boolean; completed: boolean; pointsAwarded: number; badgeAwards?: unknown[]; recommendationId?: number | null };
+export type AttemptStartResponse = { attempt: QuizAttempt };
+export type AttemptResponse = { attempt: QuizAttempt; result: QuizResult | null };
+export type QuizSubmissionResponse = { result: QuizResult; topics: unknown[] };
+export type RankingItem = { name: string; department: string; points: number; rank: number };
+export type ChallengeSummary = { id: number; title: string; question: string; deadlineAt: string; points: number; participants: number; joined: boolean };
