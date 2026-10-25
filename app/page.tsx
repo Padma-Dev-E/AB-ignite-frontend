@@ -11,7 +11,7 @@ import {
 } from "@headlessui/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { getSession, signIn, signOut as authSignOut } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { isActiveNav, NAV_ITEMS, pageTitle } from "../src/lib/navigation";
 import {
   Button,
@@ -62,6 +62,7 @@ import { NotificationNavigationProvider } from "../src/features/employee/notific
 import { NotificationAnnouncementDetail, NotificationFeedbackDetail, NotificationRecommendationDetail } from "../src/features/employee/notification-destinations";
 import { EmployeeProfileCard } from "../src/features/employee/employee-profile";
 import { PortalBrand, PortalTopBar, portalNavigationClass, portalNavigationItemClass, portalSidebarClass } from "../src/components/layout/portal-shell";
+import { logoutToLogin } from "../src/auth/logout";
 
 type Page =
   | "community"
@@ -2163,13 +2164,7 @@ export default function Home(props: unknown) {
     const destination = session?.user?.role === "employee" ? "/private" : "/private/admin";
     window.location.assign(destination);
   };
-  const signOut = async () => {
-    await fetch("/api/auth/refresh", {
-      method: "DELETE",
-      credentials: "same-origin",
-    });
-    await authSignOut({ callbackUrl: "/login" });
-  };
+  const signOut = async () => logoutToLogin();
   const navigate = (next: Page, preserveNotificationUrl = false) => {
     if (!preserveNotificationUrl && window.location.search) window.history.pushState({}, "", window.location.pathname);
     setPage(next);

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { signOut } from "next-auth/react";
 import { useState, type ReactNode } from "react";
+import { logoutToLogin } from "../../../auth/logout";
 import { PortalBrand, PortalTopBar, portalNavigationClass, portalNavigationItemClass, portalSidebarClass } from "../../../components/layout/portal-shell";
 
 export const adminNavigation = [
@@ -26,8 +26,7 @@ export function AdminShell({ email, name, role, views, active, onNavigate, child
   const [mobileOpen, setMobileOpen] = useState(false);
   const title = adminNavigation.find(item => item.id === active)?.label ?? "Back office";
   async function leave() {
-    try { await fetch("/api/auth/refresh", { method: "DELETE", credentials: "same-origin" }); }
-    finally { await signOut({ callbackUrl: "/login" }); }
+    await logoutToLogin();
   }
   const navigation = <nav aria-label="Back office navigation" className={portalNavigationClass}>{adminNavigation.filter(item => views.includes(item.id)).map(item => <button key={item.id} type="button" aria-current={active === item.id ? "page" : undefined} onClick={() => { onNavigate(item.id); setMobileOpen(false); }} className={`${portalNavigationItemClass} ${active === item.id ? "bg-gradient-to-r from-blue/20 to-transparent font-medium text-ink before:absolute before:bottom-[9px] before:left-0 before:top-[9px] before:w-[3px] before:rounded-sm before:bg-blue" : "text-muted hover:bg-[var(--hover)] hover:text-ink"}`}>{item.label}</button>)}</nav>;
   const footer = <div className="mt-auto rounded-[14px] border p-3.5 text-[12.5px] text-muted" style={{ borderColor: "var(--line)" }}>

@@ -1,8 +1,8 @@
 "use client";
 
-import { signOut } from "next-auth/react";
 import { FirstLoginPasswordChange } from "../../src/components/auth/first-login-password-change";
 import { apiFetch } from "../../src/lib/api/client";
+import { logoutToLogin } from "../../src/auth/logout";
 
 export default function ChangePasswordPage() {
   async function changePassword(input: { currentPassword: string; newPassword: string }) {
@@ -12,7 +12,7 @@ export default function ChangePasswordPage() {
       body: JSON.stringify(input),
     });
     if (!result.changed || !result.sessionsRevoked) throw new Error("Password change was not confirmed. Please try again.");
-    await signOut({ callbackUrl: "/login" });
+    await logoutToLogin();
   }
 
   return <FirstLoginPasswordChange onChangePassword={changePassword} />;

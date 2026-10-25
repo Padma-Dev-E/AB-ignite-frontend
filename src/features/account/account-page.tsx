@@ -1,8 +1,8 @@
 'use client';
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { signOut } from 'next-auth/react';
 import { Button, Card } from '../../components/ui';
+import { logoutToLogin } from '../../auth/logout';
 import { apiFetch } from '../../lib/api/client';
 import { useEmployeeProfile } from '../employee/profile-hooks';
 import { usePointsSummary } from '../points/hooks';
@@ -39,8 +39,7 @@ export function AccountOverview({ onNavigate }: { onNavigate: (page: Page) => vo
     try { await change.mutateAsync({ currentPassword, newPassword }); setCurrent(''); setNew(''); } catch { /* Render mutation error. */ }
   }
   async function leave() {
-    await fetch('/api/auth/refresh', { method: 'DELETE', credentials: 'same-origin' });
-    await signOut({ callbackUrl: '/login' });
+    await logoutToLogin();
   }
   if (selectedIdea !== null) return <EmployeeIdeaDetailPage ideaId={selectedIdea} onBack={() => setSelectedIdea(null)} />;
   return <div className="stack">
