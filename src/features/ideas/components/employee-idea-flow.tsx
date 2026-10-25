@@ -32,10 +32,12 @@ import { CommunityFeedRow } from "../../employee/community-feed";
 import type {
   Idea,
   IdeaCreateInput,
+  IdeaClarifyingQuestion,
   IdeaEnrichment,
   IdeaKind,
   IdeaPriorityBreakdown,
   IdeaSubmissionInput,
+  IdeaQuestions,
   IdeaValidation,
 } from "../types";
 
@@ -494,13 +496,6 @@ export function EmployeeCommunityPage({
   );
 }
 
-const questionPrompts = [
-  "Who experiences this problem today?",
-  "What happens today?",
-  "What is needed to make this work?",
-  "What could make the proposal difficult?",
-  "How would you know the change worked?",
-];
 const developFields = [
   {
     key: "problem",
@@ -531,7 +526,7 @@ function IdeaStepBar({ step }: { step: number }) {
         (label, index) => (
           <div
             key={label}
-            className={`flex items-center gap-2 rounded-[11px] border px-2.5 py-2.5 text-[13px] font-medium ${step === index + 1 ? "border-blue bg-blue/[.12] text-ink" : step > index + 1 ? "text-muted" : "text-[var(--dim)]"}`}
+            className={`flex items-center gap-2 rounded-[11px] border px-2.5 py-2 text-[13px] font-medium ${step === index + 1 ? "border-blue bg-blue/[.12] text-ink" : step > index + 1 ? "text-muted" : "text-[var(--dim)]"}`}
             style={{
               borderColor: step === index + 1 ? "var(--blue)" : "var(--line)",
             }}
@@ -582,9 +577,6 @@ export function EmployeeIdeaSubmissionPage({
     benefits: "",
     risks: "",
   });
-  const [answers, setAnswers] = useState<string[]>(() =>
-    questionPrompts.map(() => ""),
-  );
   const [impact, setImpact] = useState({
     turnaround: "",
     volume: "",
@@ -607,6 +599,12 @@ export function EmployeeIdeaSubmissionPage({
   const [submitError, setSubmitError] = useState<unknown>(null);
   const [submitForHumanReview, setSubmitForHumanReview] = useState(false);
   const [developmentError, setDevelopmentError] = useState<string | null>(null);
+  const [questionError, setQuestionError] = useState<string | null>(null);
+  const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
+  const [continueWithoutQuestions, setContinueWithoutQuestions] = useState(false);
+  const [pendingQuestions, setPendingQuestions] = useState(false);
+  const [questionVersionId, setQuestionVersionId] = useState<number | null>(null);
+  const [aiAction, setAiAction] = useState<"enrich" | "questions" | "validate" | null>(null);
   const [appliedRunId, setAppliedRunId] = useState<number | null>(null);
   const validationSnapshot = useRef<string | null>(null);
   const [validatedContent, setValidatedContent] = useState<string | null>(null);
@@ -644,10 +642,12 @@ export function EmployeeIdeaSubmissionPage({
   const currentRuns = allIdeaRuns.filter(
     (run) => run.ideaVersionId === created?.versionId,
   );
-  const enrichmentRun = currentRuns.find((run) => run.jobKey === "idea.enrich");
-  const validationRun = currentRuns.find(
-    (run) => run.jobKey === "idea.validate",
-  );
+  const latestCurrentRun = (jobKey: string) => currentRuns
+    .filter((run) => run.jobKey === jobKey)
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0];
+  const enrichmentRun = latestCurrentRun("idea.enrich");
+  const validationRun = latestCurrentRun("idea.validate");
+  const questionsRun = latestCurrentRun("idea.questions");
   const enrichment =
     enrichmentRun?.status === "succeeded"
       ? (enrichmentRun.result as (IdeaEnrichment & { solutionStatement?: string; riskStatement?: string }) | null)
@@ -656,14 +656,18 @@ export function EmployeeIdeaSubmissionPage({
     validationRun?.status === "succeeded"
       ? (validationRun.result as IdeaValidation | null)
       : null;
+  const generatedQuestionData = questionsRun?.status === "succeeded"
+    ? (questionsRun.result as IdeaQuestions | null)
+    : null;
+  const reviewerQuestions: IdeaClarifyingQuestion[] = generatedQuestionData?.questions ?? [];
   const validationScore = normalizeIdeaValidationScore(validation?.overallScore);
   const validationPassed = ideaValidationPasses(validation);
-  const lowValidationVersions = new Set(allIdeaRuns.flatMap((run) => {
-    if (run.jobKey !== "idea.validate" || run.status !== "succeeded" || run.ideaVersionId <= 0) return [];
+  const lowValidationRuns = allIdeaRuns.filter((run) => {
+    if (run.jobKey !== "idea.validate" || run.status !== "succeeded" || run.ideaVersionId <= 0) return false;
     const result = run.result as IdeaValidation | null;
     const score = normalizeIdeaValidationScore(result?.overallScore);
-    return score !== null && score <= 7 ? [run.ideaVersionId] : [];
-  }));
+    return score !== null && score <= 7;
+  });
   const currentContent = JSON.stringify({ kind, raw, title, summary, details });
   const validationIsCurrent = Boolean(
     validationRun &&
@@ -671,7 +675,7 @@ export function EmployeeIdeaSubmissionPage({
     validationRun.ideaVersionId === created.versionId &&
     validatedContent === currentContent,
   );
-  const canSubmitForHumanReview = Boolean(validationIsCurrent && validationScore !== null && validationScore <= 7 && lowValidationVersions.size >= 2);
+  const canSubmitForHumanReview = Boolean(validationIsCurrent && validationScore !== null && validationScore <= 7 && lowValidationRuns.length >= 2);
   const validationBlocked = !validationIsCurrent || (!validationPassed && !canSubmitForHumanReview);
   const metrics = {
     turnaround: Number(impact.turnaround),
@@ -684,13 +688,7 @@ export function EmployeeIdeaSubmissionPage({
     ? scorePriority(metrics, priorityPolicyQuery.data)
     : null;
   const submissionInput: IdeaSubmissionInput = {
-    answers: {
-      beneficiaries: answers[0],
-      currentProcess: answers[1],
-      needed: answers[2],
-      risks: answers[3],
-      successMeasure: answers[4],
-    },
+    answers: questionAnswers,
     metrics: {
       ...metrics,
       turnaroundExplanation: metricExplanations.turnaround || undefined,
@@ -700,10 +698,13 @@ export function EmployeeIdeaSubmissionPage({
     buildsOnId,
     differentiation: differentiation.trim() || undefined,
   };
+  const requiredQuestionsAnswered = reviewerQuestions.every(
+    (question) => !question.required || Boolean(questionAnswers[question.question]?.trim()),
+  );
   const fieldsValid =
     title.trim().length >= 3 &&
     summary.trim().length >= 10 &&
-    answers.every((answer) => answer.trim().length > 0) &&
+    requiredQuestionsAnswered &&
     Object.values(impact).every((value) => value.trim().length > 0) &&
     [metrics.turnaround, metrics.volume, metrics.value].every(
       (value) => Number.isFinite(value) && value >= 0 && value <= 3,
@@ -733,13 +734,7 @@ export function EmployeeIdeaSubmissionPage({
     });
     setBuildsOnId(idea.buildsOnId ?? undefined);
     if (submission) {
-      setAnswers([
-        submission.answers.beneficiaries,
-        submission.answers.currentProcess,
-        submission.answers.needed,
-        submission.answers.risks,
-        submission.answers.successMeasure,
-      ]);
+      setQuestionAnswers(submission.answers);
       setImpact({
         turnaround: String(submission.metrics.turnaround),
         volume: String(submission.metrics.volume),
@@ -762,14 +757,15 @@ export function EmployeeIdeaSubmissionPage({
   useEffect(() => {
     if (!enrichment || !enrichmentRun || appliedRunId === enrichmentRun.id)
       return;
-    setTitle((current) => current.trim() ? current : enrichment.suggestedTitle);
-    setSummary((current) => current.trim() ? current : enrichment.conciseSummary);
+    const firstEnrichment = appliedRunId === null;
+    setTitle((current) => firstEnrichment ? enrichment.suggestedTitle : current.trim() ? current : enrichment.suggestedTitle);
+    setSummary((current) => firstEnrichment ? enrichment.conciseSummary : current.trim() ? current : enrichment.conciseSummary);
     setDetails((current) => ({
       ...current,
-      problem: current.problem.trim() ? current.problem : enrichment.problemStatement,
-      benefits: current.benefits.trim() ? current.benefits : enrichment.valueStatement,
-      solution: current.solution.trim() ? current.solution : (enrichment.solutionStatement ?? current.solution),
-      risks: current.risks.trim() ? current.risks : (enrichment.riskStatement ?? current.risks),
+      problem: firstEnrichment || !current.problem.trim() ? enrichment.problemStatement : current.problem,
+      benefits: firstEnrichment || !current.benefits.trim() ? enrichment.valueStatement : current.benefits,
+      solution: firstEnrichment || !current.solution.trim() ? (enrichment.solutionStatement ?? current.solution) : current.solution,
+      risks: firstEnrichment || !current.risks.trim() ? (enrichment.riskStatement ?? current.risks) : current.risks,
     }));
     setAppliedRunId(enrichmentRun.id);
   }, [appliedRunId, enrichment, enrichmentRun]);
@@ -783,6 +779,34 @@ export function EmployeeIdeaSubmissionPage({
       setValidatedContent(validationSnapshot.current);
     }
   }, [created, currentContent, validation, validationRun]);
+
+  useEffect(() => {
+    if (!pendingQuestions || questionVersionId === null) return;
+    const questionRun = currentRuns
+      .filter((run) => run.jobKey === "idea.questions" && run.ideaVersionId === questionVersionId)
+      .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0];
+    if (questionRun?.status === "succeeded") {
+      const result = questionRun.result as IdeaQuestions | null;
+      const questions = result?.questions ?? [];
+      setQuestionAnswers((current) => Object.fromEntries(
+        questions.map((question) => [question.question, current[question.question] ?? ""]),
+      ));
+      setPendingQuestions(false);
+      setQuestionVersionId(null);
+      setQuestionError(null);
+      setContinueWithoutQuestions(false);
+      dispatch(setIdeaWizardStep(3));
+      return;
+    }
+    if (
+      questionRun &&
+      ["failed", "timed_out", "cancelled"].includes(questionRun.status)
+    ) {
+      setPendingQuestions(false);
+      setQuestionVersionId(null);
+      setQuestionError("AI could not prepare questions for this draft. Retry, or continue without AI-generated questions.");
+    }
+  }, [currentRuns, dispatch, pendingQuestions, questionVersionId]);
   const applyEnrichment = () => {
     if (!enrichment || !enrichmentRun) return;
     setTitle(enrichment.suggestedTitle);
@@ -797,15 +821,6 @@ export function EmployeeIdeaSubmissionPage({
     setAppliedRunId(enrichmentRun.id);
   };
 
-  const nextFromDescribe = () => {
-    if (raw.trim().length < 10) return;
-    if (!title.trim()) setTitle(raw.trim().split("\n")[0].slice(0, 120));
-    if (!summary.trim()) setSummary(raw.trim());
-    if (!details[kind === "problem" ? "problem" : "solution"].trim()) {
-      setDetails((current) => ({ ...current, [kind === "problem" ? "problem" : "solution"]: raw.trim() }));
-    }
-    dispatch(setIdeaWizardStep(2));
-  };
   const draftInput = (): IdeaCreateInput => ({
     kind,
     title: title.trim(),
@@ -847,18 +862,84 @@ export function EmployeeIdeaSubmissionPage({
     setCreated(result);
     return result;
   };
-  const requestDevelopment = async (action: "enrich" | "validate") => {
-    if (title.trim().length < 3 || summary.trim().length < 10) return;
+  const requestDevelopment = async (action: "enrich" | "questions" | "validate") => {
+    if (title.trim().length < 3 || summary.trim().length < 10) return null;
     setDevelopmentError(null);
+    setAiAction(action);
     try {
       if (action === "validate") {
         validationSnapshot.current = currentContent;
         setValidatedContent(null);
       }
       const draft = await syncDraft();
+      if (action === "questions") setQuestionVersionId(draft.versionId);
       await developmentMutation.mutateAsync({ id: draft.idea.id, action });
+      return draft;
+    } catch (error) {
+      if (action === "questions") setQuestionError(errorMessage(error));
+      else setDevelopmentError(errorMessage(error));
+      return null;
+    } finally {
+      setAiAction(null);
+    }
+  };
+
+  const prepareReviewerQuestions = async () => {
+    setPendingQuestions(true);
+    setQuestionError(null);
+    setContinueWithoutQuestions(false);
+    const draft = await requestDevelopment("questions");
+    if (!draft) {
+      setPendingQuestions(false);
+      setQuestionVersionId(null);
+      setQuestionError("AI could not prepare questions for this draft. Retry, or continue without AI-generated questions.");
+    }
+  };
+
+  const proceedWithoutGeneratedQuestions = () => {
+    setQuestionAnswers({});
+    setContinueWithoutQuestions(true);
+    setQuestionError(null);
+    dispatch(setIdeaWizardStep(3));
+  };
+
+  const startIdeaDevelopment = async () => {
+    const description = raw.trim();
+    if (description.length < 10) return;
+    const initialTitle = title.trim() || description.split("\n")[0].slice(0, 120);
+    const initialSummary = summary.trim() || description;
+    const initialDetails = {
+      problem: details.problem.trim() || (kind === "problem" ? description : ""),
+      solution: details.solution.trim() || (kind === "idea" ? description : ""),
+      benefits: details.benefits,
+      risks: details.risks,
+    };
+    setTitle(initialTitle);
+    setSummary(initialSummary);
+    setDetails(initialDetails);
+    setDevelopmentError(null);
+    setAiAction("enrich");
+    dispatch(setIdeaWizardStep(2));
+    try {
+      const draft = await createMutation.mutateAsync({
+        kind,
+        title: initialTitle,
+        summary: initialSummary,
+        category: "Customer",
+        problem: initialDetails.problem || undefined,
+        solution: initialDetails.solution || undefined,
+        benefits: initialDetails.benefits.trim() || undefined,
+        risks: initialDetails.risks.trim() || undefined,
+        dataClassification: "internal",
+        buildsOnId,
+        differentiation: differentiation.trim() || undefined,
+      });
+      setCreated(draft);
+      await developmentMutation.mutateAsync({ id: draft.idea.id, action: "enrich" });
     } catch (error) {
       setDevelopmentError(errorMessage(error));
+    } finally {
+      setAiAction(null);
     }
   };
   const finishSubmit = async (id: number, versionId: number, humanReview = submitForHumanReview) => {
@@ -1074,7 +1155,7 @@ export function EmployeeIdeaSubmissionPage({
                     benefits: "",
                     risks: "",
                   });
-                  setAnswers(questionPrompts.map(() => ""));
+                  setQuestionAnswers({});
                   setImpact({ turnaround: "", volume: "", value: "" });
                   dispatch(resetIdeaWizard());
                 }}
@@ -1088,28 +1169,32 @@ export function EmployeeIdeaSubmissionPage({
     );
   }
   return (
-    <div className="stack">
-      <section className="hero-surface relative overflow-hidden rounded-[24px] px-5 py-6 text-white sm:px-7 sm:py-[30px]">
+    <div className="stack mx-auto -mt-0.5 w-full max-w-[922px] gap-[25px] lg:translate-x-[7px]">
+      {step === 1 && <section className="hero-surface relative overflow-hidden rounded-[24px] px-5 py-6 text-white sm:px-7 sm:py-6">
         <div className="relative z-10 max-w-[62%]">
           <h1 className="text-[25px] font-medium leading-tight tracking-[-.02em] sm:text-[32px]">
-            Share an idea
+            Share an idea ✨
           </h1>
           <p className="mt-1.5 text-sm leading-6 text-white/85 sm:text-[15px]">
-            Turn a customer or colleague insight into a clear proposal the bank
-            can act on.
+            One sentence is enough. AI checks it is original, develops it with you and validates it against the bank’s criteria.
           </p>
         </div>
-      </section>
+      </section>}
       <IdeaStepBar step={step} />
+      {step === 2 && (
+        <div className="flex flex-wrap items-start gap-2 rounded-xl border px-4 py-[11px] text-[13px]" style={{ borderColor: "var(--line)" }} role="status">
+          <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-[#0e9f7a]" />
+          <div className="min-w-0 flex-1">
+            {candidateQuery.isPending ? <span className="text-muted">Checking whether this idea is already registered…</span> : candidateQuery.isError ? <span className="text-[#d6336c]">Originality check is temporarily unavailable. Retry the check before submitting.</span> : (candidateQuery.data?.items.length ?? 0) === 0 ? <><b className="text-[#0e9f7a]">Originality check passed.</b> <span className="text-muted">No registered idea matches yours.</span></> : <><b className="text-sand">Related ideas found.</b> <span className="text-muted">Your idea can still proceed; review any related work below.</span> <span className="mt-1 block truncate text-blue">{candidateQuery.data?.items.slice(0, 3).map((item) => item.title).join(" · ")}</span></>}
+          </div>
+        </div>
+      )}
       {step === 2 && (
         <section className="app-card" aria-label="AI development suggestions">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-medium">Develop your idea</h2>
-              <p className="mt-1 text-sm text-muted">
-                Review and edit the structured fields. AI suggestions fill empty
-                fields when available; you can complete them manually.
-              </p>
+              <h2 className="text-lg font-medium">AI enhancement</h2>
+              <p className="mt-1 text-sm text-muted">A fuller version of your idea, drafted by AI. Edit anything that isn’t right.</p>
             </div>
             <button
               className="btn"
@@ -1122,15 +1207,26 @@ export function EmployeeIdeaSubmissionPage({
               }
               onClick={() => void requestDevelopment("enrich")}
             >
-              {createMutation.isPending ||
-              draftMutation.isPending ||
-              developmentMutation.isPending
-                ? "Preparing…"
-                : "Suggest improvements"}
+              {aiAction === "enrich" || createMutation.isPending || draftMutation.isPending || developmentMutation.isPending
+                ? "Improving…"
+                : <><Icon name="spark" className="mr-2 inline-block h-4 w-4" />Improve with AI</>}
             </button>
           </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="block sm:col-span-2">
+          {(aiAction === "enrich" || enrichmentRun?.status === "queued" || enrichmentRun?.status === "running") && (
+            <div className="mt-4 flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: "var(--line)" }} role="status" aria-live="polite">
+              <span className="mt-0.5 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-blue/25 border-t-blue" aria-hidden="true" />
+              <div>
+                <p className="font-medium">{enrichmentRun?.status === "running" ? "AI is developing your idea" : "Checking originality and developing your idea"}</p>
+                <p className="mt-1 text-sm text-muted">We’re shaping your title, summary, problem, solution, benefits, and risks. You can review and edit every field when the draft is ready.</p>
+              </div>
+            </div>
+          )}
+          <div className="mt-4 flex min-h-[50px] flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-3 text-xs text-muted" style={{ borderColor: "var(--line)" }}>
+            <span>Area of enhancement <b className="ml-1 rounded-full bg-blue/10 px-2 py-1 text-blue">Customer</b></span>
+            <span>Assigned automatically. Re-checked when you submit.</span>
+          </div>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label className="block">
               <span className="field-label">Idea title</span>
               <input
                 className="input"
@@ -1141,7 +1237,7 @@ export function EmployeeIdeaSubmissionPage({
             <label className="block sm:col-span-2">
               <span className="field-label">Summary</span>
               <textarea
-                className="input min-h-[90px]"
+                className="input min-h-[72px]"
                 value={summary}
                 onChange={(event) => setSummary(event.target.value)}
               />
@@ -1162,7 +1258,7 @@ export function EmployeeIdeaSubmissionPage({
               </label>
             ))}
           </div>
-          {created && developmentQuery.isPending && (
+          {created && developmentQuery.isPending && aiAction === "enrich" && (
             <p className="mt-3 text-sm text-muted" aria-live="polite">
               Loading AI suggestions…
             </p>
@@ -1182,19 +1278,7 @@ export function EmployeeIdeaSubmissionPage({
                 manually.
               </p>
             )}
-          {enrichment && (
-            <>
-              <p className="mt-3 text-sm text-muted">
-                AI suggestions were added to empty fields; all fields remain
-                editable.
-              </p>
-              <button className="btn mt-2" onClick={applyEnrichment}>
-                {appliedRunId === enrichmentRun?.id
-                  ? "Reapply suggestions"
-                  : "Apply suggestions"}
-              </button>
-            </>
-          )}
+          {enrichment && appliedRunId !== enrichmentRun?.id && <div className="mt-3"><p className="text-sm text-muted">AI improvements are ready. Applying them will replace the current wording; all fields remain editable.</p><button className="btn mt-2" onClick={applyEnrichment}>Apply AI improvements</button></div>}
           {developmentQuery.isError && (
             <p className="mt-3 text-sm text-[#d6336c]" role="alert">
               {errorMessage(developmentQuery.error)}{" "}
@@ -1213,8 +1297,34 @@ export function EmployeeIdeaSubmissionPage({
           )}
           <div className="mt-4 flex flex-wrap gap-2">
             <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(1))}>Back to describe</button>
-            <button className="btn-primary" type="button" disabled={title.trim().length < 3 || summary.trim().length < 10 || developmentMutation.isPending} onClick={() => dispatch(setIdeaWizardStep(3))}>Continue to questions</button>
+            <button className="btn-primary" type="button" disabled={title.trim().length < 3 || summary.trim().length < 10 || developmentMutation.isPending || pendingQuestions} onClick={() => void prepareReviewerQuestions()}>
+              {pendingQuestions || aiAction === "questions" ? "Generating idea-specific questions…" : "Generate questions with AI"}
+            </button>
           </div>
+          {(pendingQuestions || questionsRun?.status === "queued" || questionsRun?.status === "running") && (
+            <div className="mt-4 flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: "var(--line)" }} role="status" aria-live="polite">
+              <span className="mt-0.5 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-blue/25 border-t-blue" aria-hidden="true" />
+              <div>
+                <p className="font-medium">AI is reading your idea for missing details</p>
+                <p className="mt-1 text-sm text-muted">It will prepare only the follow-up questions needed for this draft.</p>
+              </div>
+            </div>
+          )}
+          {questionError && (
+            <div className="mt-3 rounded-xl border border-[#d6336c]/35 p-3 text-sm" role="alert">
+              <p>{questionError}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button className="btn btn-small" type="button" disabled={pendingQuestions} onClick={() => void prepareReviewerQuestions()}>{pendingQuestions ? "Retrying…" : "Retry AI questions"}</button>
+                <button className="btn btn-small" type="button" onClick={proceedWithoutGeneratedQuestions}>Continue without questions</button>
+              </div>
+            </div>
+          )}
+          {developmentError && (
+            <p className="mt-3 text-sm text-[#d6336c]" role="alert">
+              {developmentError}{" "}
+              <button className="underline" type="button" onClick={() => void (created ? requestDevelopment("enrich") : startIdeaDevelopment())}>Retry AI development</button>
+            </p>
+          )}
         </section>
       )}
       {step === 3 && (
@@ -1222,16 +1332,48 @@ export function EmployeeIdeaSubmissionPage({
           <div className="flex items-start gap-3">
             <div className="icon-box"><Icon name="bot" /></div>
             <div>
-              <h2 className="text-lg font-medium">Questions reviewers may ask</h2>
-              <p className="mt-1 text-muted">Answer each prompt so the reviewer can understand the context and measure the outcome.</p>
+              <h2 className="text-lg font-medium">Questions about your idea</h2>
+              <p className="mt-1 text-muted">AI uses your draft to identify the details reviewers may still need. Answer the required questions that apply.</p>
             </div>
           </div>
-          <div className="mt-4 space-y-3">
-            {questionPrompts.map((prompt, index) => <label key={prompt} className="block rounded-xl border-l-2 px-3 py-1" style={{ borderColor: "var(--line-strong)" }}><span className="font-medium">{prompt}</span><textarea className="input mt-2 min-h-[76px]" value={answers[index]} onChange={(event) => setAnswers((current) => current.map((answer, itemIndex) => itemIndex === index ? event.target.value : answer))} placeholder="Your answer" /></label>)}
-          </div>
+          {reviewerQuestions.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              <div className="rounded-xl border p-3 text-sm" style={{ borderColor: "var(--line)" }}>
+                <b>{reviewerQuestions.length} AI-generated question{reviewerQuestions.length === 1 ? "" : "s"}</b>
+                {generatedQuestionData && <span className="ml-2 text-muted">Draft completeness: {Math.round(generatedQuestionData.completeness <= 1 ? generatedQuestionData.completeness * 100 : generatedQuestionData.completeness)}%</span>}
+              </div>
+              {reviewerQuestions.map((item, index) => {
+                const key = item.question;
+                const value = questionAnswers[key] ?? "";
+                return (
+                  <label key={item.id} className="block rounded-xl border-l-2 px-3 py-1" style={{ borderColor: "var(--line-strong)" }}>
+                    <span className="font-medium">{index + 1}. {item.question}</span>
+                    <span className="ml-2 text-xs text-muted">{item.required ? "Required" : "Optional"} · {item.answerType === "choice" ? "Choice response" : item.answerType}</span>
+                    {item.reason && <span className="mt-1 block text-sm text-muted">Why this matters: {item.reason}</span>}
+                    {item.answerType === "boolean" ? (
+                      <select className="input mt-2" value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))}>
+                        <option value="">Choose an answer</option><option value="yes">Yes</option><option value="no">No</option>
+                      </select>
+                    ) : item.answerType === "number" || item.answerType === "date" ? (
+                      <input className="input mt-2" type={item.answerType} value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))} />
+                    ) : item.answerType === "choice" ? (
+                      <input className="input mt-2" value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))} placeholder="Enter your chosen response" />
+                    ) : (
+                      <textarea className="input mt-2 min-h-[76px]" value={value} onChange={(event) => setQuestionAnswers((current) => ({ ...current, [key]: event.target.value }))} placeholder="Your answer" />
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border p-4 text-sm" style={{ borderColor: "var(--line)" }} role="status">
+              <b>{continueWithoutQuestions ? "Continuing without AI-generated questions" : "No further questions"}</b>
+              <p className="mt-1 text-muted">The AI found no additional questions for this draft. You can continue to validation.</p>
+            </div>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
             <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(2))}>Back to develop</button>
-            <button className="btn-primary" type="button" disabled={!answers.every((answer) => answer.trim().length > 0)} onClick={() => dispatch(setIdeaWizardStep(4))}>Continue to validation</button>
+            <button className="btn-primary" type="button" disabled={!requiredQuestionsAnswered} onClick={() => dispatch(setIdeaWizardStep(4))}>Continue to pass or fail</button>
           </div>
         </section>
       )}
@@ -1285,6 +1427,15 @@ export function EmployeeIdeaSubmissionPage({
             )}
           {validation && (
             <div className="mt-4 space-y-2 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: validationPassed ? "rgba(14,159,122,.45)" : "rgba(214,51,108,.4)" }} aria-live="polite">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted">AI idea score</p>
+                  <p className="mt-1 text-2xl font-semibold">{validationScore === null ? "—" : `${validationScore}/10`}</p>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-sm font-medium ${validationPassed ? "bg-[#0e9f7a]/10 text-[#0e9f7a]" : "bg-[#d6336c]/10 text-[#d6336c]"}`}>
+                  {validationPassed ? "Pass · Continue to numbers" : "Fail · Improve and try again"}
+                </span>
+              </div>
               <p>
                 <b>Validation {validationPassed ? "passed" : "failed"}:</b>{" "}
                 {validationScore === null ? "Score unavailable" : `${validationScore}/10`} ·{" "}
@@ -1319,7 +1470,7 @@ export function EmployeeIdeaSubmissionPage({
                 <p className="text-[#d6336c]" role="alert">
                   {validationScore === null
                     ? "Validation returned no usable score. Run validation again before continuing."
-                    : `Your score is ${validationScore}/10; the AI validation threshold is above 7/10. Improve the draft and run validation again. After two below-threshold results on different draft versions, you can submit it for human review.`}
+                    : `Your score is ${validationScore}/10. A score above 7 passes. This is below the threshold (failed result ${lowValidationRuns.length} of 2); improve your draft and check again. After two failed results for this idea, you can continue to human review.`}
                 </p>
               )}
             </div>
@@ -1347,27 +1498,30 @@ export function EmployeeIdeaSubmissionPage({
             </p>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
-            <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(3))}>Back to questions</button>
+            <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(3))}>Review idea questions</button>
             {validation && !validationPassed && <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(2))}>Improve draft</button>}
             {canSubmitForHumanReview
-              ? <button className="btn-primary" type="button" onClick={() => dispatch(setIdeaWizardStep(5))}>Continue to human review submission</button>
+              ? <button className="btn-primary" type="button" onClick={() => dispatch(setIdeaWizardStep(5))}>Continue to human review</button>
               : <button className="btn-primary" type="button" disabled={!validationIsCurrent || !validationPassed} onClick={() => dispatch(setIdeaWizardStep(5))}>Continue to numbers</button>}
           </div>
         </section>
       )}
       {step === 5 && (
         <section className="app-card" aria-label="Impact numbers">
-          <h2 className="text-lg font-medium">Add impact numbers</h2>
-          <p className="mt-1 text-muted">Rough estimates are enough. Reviewers will refine them later.</p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <h2 className="text-lg font-medium">Three quick numbers</h2>
+          <p className="mt-1 text-sm text-muted">Your best estimate is enough; reviewers will check the figures with you. Add an optional explanation to strengthen your estimate. Your score updates as you type.</p>
+          {canSubmitForHumanReview && !validationPassed && (
+            <div className="mt-4 rounded-xl border border-sand/40 bg-sand/5 p-4 text-sm" role="status">
+              <b>Continuing to human review after two failed AI checks.</b>
+              <p className="mt-1 text-muted">Your score remains visible to reviewers. Complete the impact numbers to submit your idea for a person to assess.</p>
+            </div>
+          )}
+          <div className="mt-4 space-y-3">
             {(["turnaround", "volume", "value"] as const).map((key) => {
-              const labels = { turnaround: "Turnaround time", volume: "Volume", value: "Expected savings or revenue" };
+              const labels = { turnaround: "How much would turnaround time improve?", volume: "How many cases or customers are affected each month?", value: "What savings or revenue are expected per year?" };
               const configured = priorityPolicyQuery.data?.kpis.find((item) => item.key === key);
-              return <label className="block" key={key}><span className="field-label">{configured?.question ?? labels[key]}</span><input className="input" type="number" min="0" max="3" step="0.1" value={impact[key]} onChange={(event) => setImpact((current) => ({ ...current, [key]: event.target.value }))} placeholder="0" /><span className="mt-1 block text-xs text-muted">{configured?.hint ?? "0–3 score · explain the expected change"}{configured ? ` · ${Math.round(configured.weight * 100)}% weight` : ""}</span></label>;
+              return <div key={key} className="grid gap-3 rounded-xl border p-3 sm:grid-cols-2 sm:items-center" style={{ borderColor: "var(--line)" }}><label className="block"><span className="field-label">{labels[key]}</span><input className="input" type="number" min="0" max="3" step="0.1" value={impact[key]} onChange={(event) => setImpact((current) => ({ ...current, [key]: event.target.value }))} placeholder="0" /><span className="mt-1 block text-xs text-muted">{configured?.hint ?? "Rate expected impact from 0 to 3"}{configured ? ` · ${Math.round(configured.weight * 100)}% weight` : ""}</span></label><label className="block"><span className="field-label">Explain your estimate <span className="ml-1 text-xs font-normal text-muted">Optional</span></span><textarea className="input min-h-[76px]" value={metricExplanations[key]} onChange={(event) => setMetricExplanations((current) => ({ ...current, [key]: event.target.value }))} placeholder="Where does the estimate come from? Who is affected? Add any supporting details." /></label></div>;
             })}
-          </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            {(["turnaround", "volume", "value"] as const).map((key) => <label className="block" key={key}><span className="field-label">{key[0].toUpperCase() + key.slice(1)} explanation</span><textarea className="input min-h-[76px]" value={metricExplanations[key]} onChange={(event) => setMetricExplanations((current) => ({ ...current, [key]: event.target.value }))} /></label>)}
           </div>
           {priorityPolicyQuery.isPending && <p className="mt-4 text-sm text-muted" role="status">Loading priority policy…</p>}
           {priorityPolicyQuery.isError && <p className="mt-4 text-sm text-[#d6336c]" role="alert">Priority policy could not be loaded. <button className="underline" onClick={() => void priorityPolicyQuery.refetch()}>Retry</button></p>}
@@ -1375,20 +1529,18 @@ export function EmployeeIdeaSubmissionPage({
           {submissionError && <div className="mt-4 rounded-xl border border-[#d6336c]/40 p-4 text-sm" role="alert"><p className="font-medium text-[#d6336c]">{errorMessage(submissionError)}</p>{submissionRejection && priorityScoreRejected && <p className="mt-1">Server score / minimum: {submissionRejection.score?.toFixed(2) ?? "—"} / {submissionRejection.minimumScore?.toFixed(2) ?? "—"}{submissionRejection.priorityBand ? ` · ${submissionRejection.priorityBand}` : ""}</p>}{submissionRejection?.breakdown.map((item) => <p className="mt-1 flex justify-between gap-3" key={item.key}><span className="capitalize">{item.key} · {Math.round(item.weight * 100)}%</span><span>{item.score.toFixed(1)} → {item.contribution.toFixed(2)}</span></p>)}{priorityScoreRejected && <p className="mt-2 text-muted">Adjust the impact numbers to meet the server minimum, then submit again.</p>}</div>}
           <div className="mt-4 flex flex-wrap gap-2">
             <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(4))}>Back to validation</button>
-            <button className="btn-primary" type="button" disabled={!fieldsValid || busy || validationBlocked || !priorityResult || priorityResult.score < priorityPolicyQuery.data!.minimumScore} onClick={() => void submit(canSubmitForHumanReview && !validationPassed)}>{canSubmitForHumanReview && !validationPassed ? "Submit for human review" : "Submit idea"}</button>
+            <button className="btn-primary" type="button" disabled={!fieldsValid || busy || validationBlocked || !priorityResult || priorityResult.score < priorityPolicyQuery.data!.minimumScore} onClick={() => void submit(canSubmitForHumanReview && !validationPassed)}>{busy ? "Submitting…" : canSubmitForHumanReview && !validationPassed ? "Submit for human review" : "Submit idea"}</button>
           </div>
         </section>
       )}
       {step === 1 && (
         <div className="app-card">
-          <section className="mb-5 rounded-xl border p-3" style={{ borderColor: "var(--line)" }} aria-label="Saved drafts">
+          {(savedDrafts.length > 0 || savedDraftsQuery.isError) && <section className="mb-5 rounded-xl border p-3" style={{ borderColor: "var(--line)" }} aria-label="Saved drafts">
             <h2 className="font-medium">Your saved drafts</h2>
-            {savedDraftsQuery.isPending && <p className="mt-1 text-sm text-muted" role="status">Loading private drafts…</p>}
             {savedDraftsQuery.isError && <p className="mt-1 text-sm text-[#d6336c]" role="alert">Could not load drafts: {errorMessage(savedDraftsQuery.error)} <button className="underline" type="button" onClick={() => void savedDraftsQuery.refetch()}>Retry</button></p>}
-            {savedDrafts.length === 0 && !savedDraftsQuery.isPending && !savedDraftsQuery.isError && <p className="mt-1 text-sm text-muted">No saved drafts to resume.</p>}
             {savedDrafts.length > 0 && <ul className="mt-2 space-y-2">{savedDrafts.map((draft) => <li key={draft.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--hover)] p-2"><span className="min-w-0 flex-1"><b className="block truncate text-sm">{draft.title}</b><span className="block truncate text-xs text-muted">{draft.summary}</span></span><button className="btn btn-small" type="button" disabled={Boolean(resumeDraftId)} onClick={() => setResumeDraftId(draft.id)}>{resumeDraftId === draft.id && resumeDraftQuery.isPending ? "Loading…" : "Resume draft"}</button></li>)}</ul>}
             {resumeDraftQuery.isError && <p className="mt-2 text-sm text-[#d6336c]" role="alert">Could not open this draft: {errorMessage(resumeDraftQuery.error)} <button className="underline" type="button" onClick={() => void resumeDraftQuery.refetch()}>Retry</button></p>}
-          </section>
+          </section>}
           <div
             className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl border bg-white p-1"
             style={{ borderColor: "var(--line)" }}
@@ -1413,23 +1565,12 @@ export function EmployeeIdeaSubmissionPage({
                 : "What is slowing customers or colleagues down?"}
             </span>
             <textarea
-              className="input min-h-[124px] resize-y"
+              className="input min-h-[112px] resize-y"
               value={raw}
               onChange={(event) => setRaw(event.target.value)}
               placeholder="Describe it in your own words…"
             />
           </label>
-          <div
-            className="mt-4 flex gap-2 rounded-xl border border-dashed px-3.5 py-3 text-[13px] text-muted"
-            style={{ borderColor: "var(--line-strong)" }}
-          >
-            <Icon name="bot" className="mt-0.5 h-5 w-5 shrink-0 text-blue" />
-            <span>
-              <b className="font-medium text-sand">Server originality check.</b>{" "}
-              Related ideas are searched as you describe your proposal. The
-              final match check runs when you submit the completed details.
-            </span>
-          </div>
           {(!searchMatches || candidateQuery.isPending) && raw.trim().length >= 4 && (
             <p className="mt-3 text-sm text-muted" aria-live="polite">
               Searching registered ideas…
@@ -1511,9 +1652,9 @@ export function EmployeeIdeaSubmissionPage({
           <button
             className="btn-primary mt-4"
             disabled={raw.trim().length < 10 || !searchMatches || candidateQuery.isPending || unresolvedOriginality}
-            onClick={nextFromDescribe}
+            onClick={() => void startIdeaDevelopment()}
           >
-            <Icon name="spark" /> Develop with AI<span className="sr-only"> — Continue to develop</span>
+            <Icon name="spark" /> Develop with AI
           </button>
         </div>
       )}

@@ -2291,7 +2291,7 @@ export default function Home(props: unknown) {
   const activeNavPage: Page = page === "feedback" ? "me" : page === "recommendation" ? "library" : page === "announcement" ? "community" : page;
   return (
     <div className="app-background min-h-screen">
-      <div className="grid min-h-screen lg:grid-cols-[240px_1fr]">
+      <div className="grid min-h-screen lg:grid-cols-[225px_1fr]">
         <SideNav
           page={activeNavPage}
           open={menuOpen}
