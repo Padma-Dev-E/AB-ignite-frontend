@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export function PortalBrand({ className = "" }: { className?: string }) {
-  return <div className={`flex flex-col items-start gap-0 ${className}`}>
+  return <div className={`flex flex-col items-start gap-3 ${className}`}>
     <svg width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">
       <defs><linearGradient id="portal-flame" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FBBF24" /><stop offset="1" stopColor="#F97316" /></linearGradient></defs>
       <path d="M12.6 2.5c3.6 3.9 6.4 7.2 6.4 11.3a7 7 0 0 1-14 0c0-2.8 1.3-5 3.1-6.7.1 2.4.9 3.7 2.2 3.9 1.3-2.1 2.3-5 2.3-8.5z" fill="url(#portal-flame)" />
