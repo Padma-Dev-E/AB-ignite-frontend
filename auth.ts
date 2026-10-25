@@ -62,7 +62,7 @@ const nextAuth = NextAuth({
           if (!response.ok) throw new Error("Session validation failed.");
           const result = await response.json() as { user?: Record<string, unknown> };
           const current = result.user;
-          if (!current || String(current.id) !== String(token.sub)) throw new Error("Session validation failed.");
+          if (!current || String(current.id ?? current.userId) !== String(token.sub)) throw new Error("Session validation failed.");
           token.role = current.role as typeof token.role;
           token.name = current.name as typeof token.name;
           token.email = current.email as typeof token.email;
