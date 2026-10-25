@@ -24,6 +24,7 @@ COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/.next ./.next
 COPY --from=build --chown=node:node /app/public ./public
 COPY --chown=node:node package.json next.config.mjs ./
+COPY --chown=node:node docker ./docker
 USER node
 EXPOSE 3000
 CMD ["node_modules/.bin/next", "start", "--hostname", "0.0.0.0", "--port", "3000"]
