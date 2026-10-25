@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { ApiError } from "../../lib/api/client";
 import { Button, Card } from "../../components/ui";
 import {
@@ -91,7 +92,7 @@ export function EmployeeFeedbackCampaignForm({ appearance = "default" }: { appea
       /* mutation error is displayed inline */
     }
   }
-  if (community) return (
+  if (community) return <>
     <section className="pinned-surface relative overflow-hidden rounded-[20px] px-6 py-7 text-white shadow-[0_18px_36px_-18px_var(--blue-deep)] sm:px-6" aria-label="Feedback campaign">
       <span className="pointer-events-none absolute right-[36px] top-[8px] h-[96px] w-[96px] rounded-full bg-white/[.12]" aria-hidden="true" />
       <span className="pointer-events-none absolute right-[132px] top-[64px] h-[54px] w-[54px] rounded-full bg-white/[.11]" aria-hidden="true" />
@@ -101,27 +102,38 @@ export function EmployeeFeedbackCampaignForm({ appearance = "default" }: { appea
       <div className="relative max-w-[720px]">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-[.16em] text-white/75">Pinned · Feedback campaign</span>
+          {alreadyResponded && <span className="rounded-full border border-white/50 px-2.5 py-1 text-xs">You have shared feedback</span>}
         </div>
         <h2 className="mt-3 text-[21px] font-semibold tracking-[-.02em]">{campaign.title}</h2>
         {campaign.description && <p className="mt-2 max-w-[680px] text-sm leading-6 text-white/85">{campaign.description}</p>}
         {submitted || alreadyResponded ? (
           <p className="mt-5 inline-flex rounded-xl border border-white/30 bg-white/10 px-4 py-3 text-sm text-white" role="status">Thanks for sharing your feedback. Your response has been received.</p>
         ) : (
-          <button type="button" className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-[10px] bg-white px-4 py-2 text-[13px] font-semibold text-[#174bc9] shadow-sm transition hover:bg-[#f1f5ff]" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
-            {expanded ? "Close feedback form" : "Share Your Feedback"}
+          <button type="button" className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-[10px] bg-white px-4 py-2 text-[13px] font-semibold text-[#174bc9] shadow-sm transition hover:bg-[#f1f5ff]" aria-haspopup="dialog" onClick={() => { submit.reset(); setExpanded(true); }}>
+            Share Your Feedback <span aria-hidden="true">↗</span>
           </button>
         )}
-        {expanded && !submitted && !alreadyResponded && <div className="mt-5 rounded-[16px] border border-white/30 bg-white/[.97] p-5 text-ink shadow-[0_12px_30px_-22px_rgba(11,45,120,.6)] sm:p-6">
-          <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void sendFeedback(); }}>
-            <label className="block"><span className="field-label">Category</span><select className="input" value={category} onChange={(event) => setCategory(event.target.value as FeedbackCategory)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-            <label className="block"><span className="field-label">Your feedback</span><textarea className="input min-h-[100px] resize-y" value={message} onChange={(event) => setMessage(event.target.value)} maxLength={4000} required placeholder="What would make your experience better?" /></label>
-            {submit.isError && <p className="text-sm text-[#d6336c]" role="alert">{messageFor(submit.error)}</p>}
-            <Button variant="primary" type="submit" disabled={!message.trim() || submit.isPending}>{submit.isPending ? "Sending…" : "Send feedback"}</Button>
-          </form>
-        </div>}
       </div>
     </section>
-  );
+    <Dialog open={expanded} onClose={() => { if (!submit.isPending) setExpanded(false); }} className="relative z-[80]">
+      <div className="fixed inset-0 bg-[rgba(3,10,30,.55)] backdrop-blur-[5px]" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-center justify-center overflow-y-auto p-5">
+        <DialogPanel className="relative max-h-[88vh] w-full max-w-[520px] overflow-y-auto rounded-[20px] border border-[var(--line)] bg-[var(--card)] p-6 shadow-[0_24px_60px_-14px_rgba(3,10,30,.5)]">
+          <div className="flex items-center justify-between gap-4">
+            <DialogTitle className="text-xl font-semibold">Share your feedback</DialogTitle>
+            <button type="button" aria-label="Close feedback dialog" className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] border border-[var(--line)] bg-white text-xl text-muted hover:bg-[var(--hover)]" onClick={() => setExpanded(false)}>×</button>
+          </div>
+          {submitted ? <div className="pt-6 text-center"><span aria-hidden="true" className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-teal/10 text-2xl text-teal">✓</span><h3 className="mt-3 text-lg font-semibold">Thank you</h3><p className="mt-2 text-sm text-muted">Your feedback has been received. You can follow it under My account › My Feedback.</p><Button variant="primary" className="mt-5" onClick={() => setExpanded(false)}>Done</Button></div> : <><p className="mt-2 text-sm text-muted">About AB Ignite itself: what would make it more valuable to you? This goes to the platform team, separately from the idea pipeline.</p>
+            <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); void sendFeedback(); }}>
+              <label className="block"><span className="field-label">Your feedback</span><textarea autoFocus className="input min-h-[130px] resize-y" value={message} onChange={(event) => setMessage(event.target.value)} maxLength={4000} required placeholder="What would make this platform more valuable to you?" /></label>
+              <label className="block"><span className="field-label">Category</span><select className="input" value={category} onChange={(event) => setCategory(event.target.value as FeedbackCategory)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+              {submit.isError && <p className="text-sm text-[#d6336c]" role="alert">{messageFor(submit.error)}</p>}
+              <div className="flex flex-wrap justify-end gap-2"><Button type="button" onClick={() => setExpanded(false)}>Cancel</Button><Button variant="primary" type="submit" disabled={!message.trim() || submit.isPending}>{submit.isPending ? "Sending…" : "Send feedback"}</Button></div>
+            </form></>}
+        </DialogPanel>
+      </div>
+    </Dialog>
+  </>;
   return (
     <Card className={cardClass}>
       <div className="flex flex-wrap items-start justify-between gap-3">
