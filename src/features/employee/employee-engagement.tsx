@@ -6,10 +6,11 @@ import { Button, Card } from "../../components/ui";
 import {
   useEmployeeNotifications,
   useFeedbackCampaign,
+  usePublishedAnnouncements,
   useSetEmployeeNotificationRead,
   useSubmitEmployeeFeedback,
 } from "./engagement-hooks";
-import type { FeedbackCategory, Notification } from "./engagement-api";
+import type { FeedbackCategory, Notification, PublishedAnnouncement } from "./engagement-api";
 import { notificationDestination } from "./notification-navigation";
 import { useNotificationNavigation } from "./notification-navigation-context";
 
@@ -307,4 +308,75 @@ export function EmployeeNotificationsPanel({ onOpenNotification }: { onOpenNotif
       )}
     </Card>
   );
+}
+
+export function EmployeeCommunityUpdates({
+  onOpenAnnouncement,
+}: {
+  onOpenAnnouncement: (id: number) => void;
+}) {
+  const announcementsQuery = usePublishedAnnouncements();
+  const notificationsQuery = useEmployeeNotifications();
+  const setRead = useSetEmployeeNotificationRead();
+  const navigate = useNotificationNavigation();
+  const announcements = announcementsQuery.data?.items ?? [];
+  const notifications = notificationsQuery.data?.items ?? [];
+  const announcementIds = new Set(announcements.map((item) => item.id));
+  const updates = [
+    ...announcements.map((announcement) => ({
+      kind: "announcement" as const,
+      announcement,
+      notification: notifications.find((item) => item.target.type === "announcement" && item.target.id === announcement.id),
+      date: announcement.publishedAt,
+    })),
+    ...notifications
+      .filter((item) => !(item.target.type === "announcement" && item.target.id !== null && announcementIds.has(item.target.id)))
+      .map((notification) => ({ kind: "notification" as const, notification, date: notification.createdAt })),
+  ].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 6);
+
+  if (announcementsQuery.isPending && notificationsQuery.isPending) {
+    return <p className="mt-4 text-sm text-muted" role="status">Loading updates…</p>;
+  }
+  if (announcementsQuery.isError && notificationsQuery.isError) {
+    return <div className="mt-4" role="alert"><p className="text-sm text-[#d6336c]">Updates are temporarily unavailable.</p><button className="btn btn-small mt-3" onClick={() => { void announcementsQuery.refetch(); void notificationsQuery.refetch(); }}>Try again</button></div>;
+  }
+  if (!updates.length) {
+    return <p className="mt-4 text-sm text-muted">You’re all caught up. New updates will appear here.</p>;
+  }
+
+  const openPublished = (announcement: PublishedAnnouncement, notification?: Notification) => {
+    if (notification && navigate) navigate(notification);
+    else onOpenAnnouncement(announcement.id);
+  };
+
+  return <div className="mt-1 max-h-[28rem] overflow-y-auto pr-1">
+    {announcementsQuery.isError && <p className="mb-3 text-xs text-muted" role="status">Announcements are temporarily unavailable.</p>}
+    {notificationsQuery.isError && <p className="mb-3 text-xs text-muted" role="status">Some notifications are temporarily unavailable.</p>}
+    <ul className="divide-y" style={{ borderColor: "var(--line)" }}>
+      {updates.map((update) => {
+        const announcement = update.kind === "announcement" ? update.announcement : null;
+        const notification = update.kind === "announcement" ? update.notification : update.notification;
+        const title = announcement?.title ?? notification?.title ?? "Update";
+        const body = announcement?.body ?? notification?.body ?? "";
+        const date = announcement?.publishedAt ?? notification?.createdAt ?? update.date;
+        const unread = Boolean(notification && !notification.isRead);
+        return <li key={announcement ? `announcement-${announcement.id}` : `notification-${notification?.id}`} className="flex items-start gap-3 py-3 first:pt-3 last:pb-1">
+          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${unread ? "bg-blue" : "bg-[var(--line-strong)]"}`} aria-label={unread ? "Unread" : "Read"} />
+          <div className="min-w-0 flex-1">
+            {announcement ? <button type="button" className="block w-full rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue" onClick={() => openPublished(announcement, notification)}>
+              <span className="block text-sm font-medium text-blue">{title}</span>
+              <span className="mt-0.5 block text-sm text-muted">{body}</span>
+              {announcement.pinned && <span className="mt-1 inline-block text-[11px] font-medium text-blue">Pinned</span>}
+            </button> : notification && navigate ? <button type="button" className="block w-full rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue" onClick={() => navigate(notification)}>
+              <span className="block text-sm font-medium text-blue">{title}</span>
+              <span className="mt-0.5 block text-sm text-muted">{body}</span>
+            </button> : <><p className="text-sm font-medium">{title}</p><p className="mt-0.5 text-sm text-muted">{body}</p></>}
+            <time className="mt-1 block text-xs text-muted" dateTime={date}>{new Date(date).toLocaleDateString()}</time>
+          </div>
+          {unread && notification && <Button size="small" disabled={setRead.isPending} onClick={() => setRead.mutate({ id: notification.id, read: true })}>Mark read</Button>}
+        </li>;
+      })}
+    </ul>
+    {setRead.isError && <p className="mt-3 text-sm text-[#d6336c]" role="alert">{messageFor(setRead.error)}</p>}
+  </div>;
 }

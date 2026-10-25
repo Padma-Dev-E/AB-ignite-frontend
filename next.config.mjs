@@ -56,6 +56,7 @@ export default function nextConfig(phase) {
         "/api/admin/users/:id/role",
         "/api/admin/users/:id/sessions",
         "/api/admin/users/:id/sessions/:sessionId",
+        "/api/announcements",
         "/api/announcements/:id",
         "/api/articles",
         "/api/articles/:id",

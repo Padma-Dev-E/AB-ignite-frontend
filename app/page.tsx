@@ -2183,6 +2183,10 @@ export default function Home(props: unknown) {
     setSelectedIdeaId(id);
     navigate("idea");
   };
+  const openAnnouncement = (id: number) => {
+    setSelectedAnnouncementId(id);
+    navigate("announcement");
+  };
   const openNotification = (notification: Notification) => {
     const destination = notificationDestination(notification.target);
     if (destination.kind === "none") return;
@@ -2215,6 +2219,7 @@ export default function Home(props: unknown) {
         pointsError={rewardsSummaryQuery.isError}
         onNavigate={navigate}
         onOpenIdea={openIdea}
+        onOpenAnnouncement={openAnnouncement}
       />
     ) : page === "new" ? (
       <EmployeeIdeaSubmissionPage onOpenIdea={openIdea} />
@@ -2259,6 +2264,7 @@ export default function Home(props: unknown) {
         pointsError={rewardsSummaryQuery.isError}
         onNavigate={navigate}
         onOpenIdea={openIdea}
+        onOpenAnnouncement={openAnnouncement}
       />
     );
   const activeNavPage: Page = page === "feedback" ? "me" : page === "recommendation" ? "library" : page === "announcement" ? "community" : page;

@@ -11,6 +11,7 @@ import {
   engagementQueryKeys,
   getFeedbackCampaign,
   getNotifications,
+  getPublishedAnnouncements,
   submitFeedback,
   updateNotificationRead,
 } from "./engagement-api";
@@ -63,6 +64,17 @@ export function useEmployeeNotifications(enabled = true) {
         }
       : undefined,
   };
+}
+
+export function usePublishedAnnouncements(enabled = true) {
+  const session = useSession();
+  const userId = session.data?.user?.id ?? null;
+  return useQuery({
+    queryKey: ["employee", "announcements"],
+    queryFn: () => getPublishedAnnouncements(4),
+    enabled: enabled && session.status !== "loading" && Boolean(userId),
+    refetchInterval: enabled ? 30_000 : false,
+  });
 }
 
 export function useSetEmployeeNotificationRead() {

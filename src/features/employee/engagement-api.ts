@@ -49,6 +49,8 @@ export type NotificationAnnouncement = {
   body: string;
   publishedAt: string;
 };
+export type PublishedAnnouncement = NotificationAnnouncement & { pinned: boolean };
+export type PublishedAnnouncementsResponse = { items: PublishedAnnouncement[] };
 
 export function getFeedbackCampaign() {
   return apiFetch<FeedbackCampaignResponse>("/api/feedback");
@@ -77,6 +79,9 @@ export function getNotifications(page = 1, pageSize = 20, cursor?: string) {
 
 export function getNotificationAnnouncement(id: number) {
   return apiFetch<NotificationAnnouncement>(`/api/announcements/${id}`);
+}
+export function getPublishedAnnouncements(limit = 4) {
+  return apiFetch<PublishedAnnouncementsResponse>(`/api/announcements?limit=${limit}`);
 }
 export function updateNotificationRead(input: {
   id?: number;

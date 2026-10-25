@@ -25,8 +25,8 @@ import {
   useUpdateIdeaDraft,
 } from "../hooks";
 import {
+  EmployeeCommunityUpdates,
   EmployeeFeedbackCampaignForm,
-  EmployeeNotificationsPanel,
 } from "../../employee/employee-engagement";
 import type {
   Idea,
@@ -278,6 +278,7 @@ function IdeaCard({ idea, onOpen }: { idea: Idea; onOpen: () => void }) {
 export function EmployeeCommunityPage({
   onNavigate,
   onOpenIdea,
+  onOpenAnnouncement,
   points = 0,
   levelName = null,
   levelIndex = null,
@@ -286,6 +287,7 @@ export function EmployeeCommunityPage({
 }: {
   onNavigate: (page: Page) => void;
   onOpenIdea: (id: number) => void;
+  onOpenAnnouncement: (id: number) => void;
   points?: number;
   levelName?: string | null;
   levelIndex?: number | null;
@@ -379,7 +381,7 @@ export function EmployeeCommunityPage({
             <div className="pt-5"><h3 className="font-medium">Season ranking</h3><p className="mt-1 text-sm text-muted">{rank ? `You are ranked ${rank.rank} across the bank.` : rankingsQuery.isPending ? "Loading ranking…" : rankingsQuery.isError ? "Ranking is temporarily unavailable." : "Explore the bank’s innovation champions."}</p><button className="btn btn-small mt-3" onClick={() => onNavigate("learn")}>See the ranking</button></div>
           </div>
         </section>
-        <section className="app-card" aria-label="What’s new"><h2 className="mb-4 text-xl font-semibold">What’s new</h2><div className="[&>div]:border-0 [&>div]:bg-transparent [&>div]:p-0 [&>div]:shadow-none [&_h2]:sr-only"><EmployeeNotificationsPanel /></div></section>
+        <section className="app-card flex min-h-[360px] flex-col" aria-label="What’s new"><h2 className="text-xl font-semibold">What’s new</h2><EmployeeCommunityUpdates onOpenAnnouncement={onOpenAnnouncement} /></section>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-semibold">Ideas from across the bank</h2><span className="text-sm text-muted">{ideasQuery.data ? `${ideasQuery.data.total} shared` : "Community ideas"}</span></div>
       <div className="flex flex-wrap items-center gap-3">
