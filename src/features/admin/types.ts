@@ -64,7 +64,6 @@ export type AdminAuditEvent = {
   action: string;
   targetType: string | null;
   targetId: string | null;
-  reason: string | null;
   metadata: Record<string, unknown>;
   ipHash?: string | null;
 };

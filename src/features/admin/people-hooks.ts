@@ -6,7 +6,7 @@ import { createPerson, listPeople, listPersonSessions, peopleQueryKeys, resetPer
 export function usePeopleUsers(search = "") {
   return useInfiniteQuery({ queryKey: peopleQueryKeys.search(search), queryFn: ({ pageParam }) => listPeople(pageParam, search), initialPageParam: null as number | null, getNextPageParam: (lastPage) => lastPage.nextAfter ?? undefined });
 }
-export function useCreatePerson() { return usePeopleMutation((input: { name: string; email: string; department: string; jobTitle?: string; role: AdminRole; reason: string }) => createPerson(input)); }
+export function useCreatePerson() { return usePeopleMutation((input: { name: string; email: string; department: string; jobTitle?: string; role: AdminRole }) => createPerson(input)); }
 
 export function usePersonSessions(userId: number | null) {
   return useQuery({ queryKey: userId === null ? [...peopleQueryKeys.users, "no-user"] : peopleQueryKeys.sessions(userId), queryFn: () => listPersonSessions(userId!), enabled: userId !== null });
@@ -24,19 +24,19 @@ function usePeopleMutation<TVariables, TResult>(mutationFn: (variables: TVariabl
 }
 
 export function useUpdatePersonRole() {
-  return usePeopleMutation(({ userId, role, reason }: { userId: number; role: AdminRole; reason: string }) => updatePersonRole(userId, role, reason));
+  return usePeopleMutation(({ userId, role }: { userId: number; role: AdminRole }) => updatePersonRole(userId, role));
 }
 
 export function useUpdatePersonActivation() {
-  return usePeopleMutation(({ userId, active, reason }: { userId: number; active: boolean; reason: string }) => updatePersonActivation(userId, active, reason));
+  return usePeopleMutation(({ userId, active }: { userId: number; active: boolean }) => updatePersonActivation(userId, active));
 }
 
 export function useResetPersonSignInSecurity() {
-  return usePeopleMutation(({ userId, reason }: { userId: number; reason: string }) => resetPersonSignInSecurity(userId, reason));
+  return usePeopleMutation(({ userId }: { userId: number }) => resetPersonSignInSecurity(userId));
 }
 export function useResetPersonPassword() {
-  return usePeopleMutation(({ userId, reason }: { userId: number; reason: string }) => resetPersonPassword(userId, reason));
+  return usePeopleMutation(({ userId }: { userId: number }) => resetPersonPassword(userId));
 }
 export function useRevokePersonSession() {
-  return usePeopleMutation(({ userId, sessionId, reason }: { userId: number; sessionId: number; reason: string }) => revokePersonSession(userId, sessionId, reason));
+  return usePeopleMutation(({ userId, sessionId }: { userId: number; sessionId: number }) => revokePersonSession(userId, sessionId));
 }

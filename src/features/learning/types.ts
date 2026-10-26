@@ -6,6 +6,7 @@ export type QuizResult = { attemptId: number; status: string; scorePercent: numb
 export type QuizAnswer = { questionId: number; optionKey: string };
 export type QuizRecommendation = { id: number; topic: string; categoryCode: string; scorePercent: number; thresholdPercent: number; reason: string; status?: string; createdAt?: string };
 export type LearningJourney = {
+  summary: string;
   topics: Array<{ topic: string; categoryCode: string; scorePercent: number; correctCount?: number; totalQuestions?: number; quizCount?: number; levels?: string[]; quizTitles?: string[]; limitedEvidence?: boolean; trend: number[]; improvement?: { firstScorePercent: number; latestScorePercent: number; attempts: number } | null }>;
   categories: Array<{ categoryCode: string; scorePercent: number; correctCount: number; totalQuestions: number; quizCount?: number }>;
   recommendations: QuizRecommendation[];

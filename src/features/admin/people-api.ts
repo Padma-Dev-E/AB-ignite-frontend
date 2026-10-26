@@ -9,7 +9,6 @@ export type AdminUserSession = {
   idleExpiresAt: string;
   absoluteExpiresAt: string;
   revokedAt: string | null;
-  revocationReason: string | null;
   sessionVersion: number;
   isActive: boolean;
 };
@@ -36,23 +35,24 @@ function json(body: unknown): RequestInit {
 }
 
 export type AdminRole = AdminUser["role"];
-export function createPerson(input: { name: string; email: string; department: string; jobTitle?: string; role: AdminRole; reason: string }) {
-  return apiFetch<{ user: AdminUser; temporaryPassword: string }>("/api/admin/users", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+const auditMessage = (action: string) => `Automatically recorded admin action: ${action}.`;
+export function createPerson(input: { name: string; email: string; department: string; jobTitle?: string; role: AdminRole }) {
+  return apiFetch<{ user: AdminUser; temporaryPassword: string }>("/api/admin/users", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...input, reason: auditMessage("user created") }) });
 }
-export function updatePersonRole(userId: number, role: AdminRole, reason: string) {
-  return apiFetch<AdminUser>(`/api/admin/users/${userId}/role`, json({ role: role, reason }));
-}
-
-export function updatePersonActivation(userId: number, active: boolean, reason: string) {
-  return apiFetch<AdminUser>(`/api/admin/users/${userId}/activation`, json({ active, reason }));
+export function updatePersonRole(userId: number, role: AdminRole) {
+  return apiFetch<AdminUser>(`/api/admin/users/${userId}/role`, json({ role, reason: auditMessage("user role changed") }));
 }
 
-export function resetPersonSignInSecurity(userId: number, reason: string) {
-  return apiFetch<AdminUser>(`/api/admin/users/${userId}/reset`, { ...json({ reason }), method: "POST" });
+export function updatePersonActivation(userId: number, active: boolean) {
+  return apiFetch<AdminUser>(`/api/admin/users/${userId}/activation`, json({ active, reason: auditMessage(active ? "user activated" : "user deactivated") }));
 }
-export function resetPersonPassword(userId: number, reason: string) {
-  return apiFetch<{ temporaryPassword: string }>(`/api/admin/users/${userId}/password`, { ...json({ reason }), method: "POST" });
+
+export function resetPersonSignInSecurity(userId: number) {
+  return apiFetch<AdminUser>(`/api/admin/users/${userId}/reset`, { ...json({ reason: auditMessage("user sign-in security reset") }), method: "POST" });
 }
-export function revokePersonSession(userId: number, sessionId: number, reason: string) {
-  return apiFetch<{ id: number; revokedAt: string }>(`/api/admin/users/${userId}/sessions/${sessionId}`, { ...json({ reason }), method: "DELETE" });
+export function resetPersonPassword(userId: number) {
+  return apiFetch<{ temporaryPassword: string }>(`/api/admin/users/${userId}/password`, { ...json({ reason: auditMessage("user password reset") }), method: "POST" });
+}
+export function revokePersonSession(userId: number, sessionId: number) {
+  return apiFetch<{ id: number; revokedAt: string }>(`/api/admin/users/${userId}/sessions/${sessionId}`, { ...json({ reason: auditMessage("user session revoked") }), method: "DELETE" });
 }

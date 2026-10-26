@@ -12,7 +12,18 @@ function positiveSeconds(name: string, fallback: number) {
 export const accessTokenTtlSeconds = positiveSeconds("AUTH_ACCESS_TOKEN_TTL_SECONDS", 900);
 export const refreshTokenTtlSeconds = positiveSeconds("AUTH_REFRESH_TOKEN_TTL_SECONDS", 2_592_000);
 export const authSecret = process.env.AUTH_SECRET ?? (process.env.NODE_ENV === "production" ? "" : "local-development-secret-change-me");
-export const secureCookies = process.env.NODE_ENV === "production";
+function shouldUseSecureCookies() {
+  const configuredUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
+  if (!configuredUrl) return process.env.NODE_ENV === "production";
+  try {
+    const url = new URL(configuredUrl);
+    const localHost = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+    return url.protocol === "https:" || !(url.protocol === "http:" && localHost);
+  } catch {
+    return process.env.NODE_ENV === "production";
+  }
+}
+export const secureCookies = shouldUseSecureCookies();
 
 export function canAccessAdminWorkspace(role: UserRole | undefined): boolean {
   return role === "back_office" || role === "business_owner";

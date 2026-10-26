@@ -23,7 +23,6 @@ export type BadgeRuleChange = {
   eventTypes: string[];
   minimumCount: number;
   active: boolean;
-  reason: string;
 };
 
 export function adminBadgePageUrl(after: number | null) {
@@ -40,6 +39,6 @@ export async function saveAdminBadgeRule(id: number | null, input: BadgeRuleChan
   return apiFetch<AdminBadge>(id === null ? "/api/admin/badges" : `/api/admin/badges/${id}`, {
     method: id === null ? "POST" : "PATCH",
     headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, reason: `Automatically recorded admin action: badge rule ${id === null ? "created" : "updated"}.` }),
   });
 }

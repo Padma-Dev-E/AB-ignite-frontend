@@ -1,6 +1,6 @@
-# Sample Idea Submission — High AI Score Target
+# Sample Idea Submission — AI Validation and Impact Scoring
 
-Use this sample to exercise a well-defined idea that is intended to score above **8/10** in AI validation. Gemini scores can vary between runs, so the content is designed for that outcome but cannot guarantee an exact score.
+Use this sample to exercise a well-defined idea through AI validation and impact scoring. The AI validation score is based on the saved fields in **Step 2 — Develop**. It is not calculated from the reviewer answers or the impact scores entered later. AI scores can vary, and this sample does not guarantee a particular result.
 
 ## Step 1 — Describe
 
@@ -25,6 +25,8 @@ Use this sample to exercise a well-defined idea that is intended to score above 
 
 ## Step 3 — Questions reviewers may ask
 
+These answers are collected after the Develop draft is validated. They support the review and submission flow; they are not inputs to the AI validation score.
+
 - **Who experiences this problem today?** Corporate Payment Operations staff who investigate reconciliation exceptions. Corporate clients may be affected when an exception takes longer to resolve, but the pilot should first measure the internal workflow.
 - **What happens today?** Staff locate an exception, check its payment and settlement status in separate views, compare related records, and decide whether to investigate further or refer it to a specialist. The exact baseline volumes and handling times should be measured during discovery.
 - **What is needed to make this work?** Agreement on the pilot team and exception types; approved read-only access to the required source fields; a named process owner; information-security and data-access review; documented sorting and duplicate-flag rules; audit logging; and a way to compare pilot outcomes with the current process.
@@ -34,12 +36,12 @@ Use this sample to exercise a well-defined idea that is intended to score above 
 ## Step 4 — AI validation
 
 1. Select **Check with AI**.
-2. Intended result: a strong score, preferably **above 8/10**, with validation passing only if the score is **strictly above 7/10**.
-3. If the score is 7 or below, review the AI's specific gaps and update the relevant fields before checking again. Do not treat this sample's target score as guaranteed.
+2. Review the score and evidence-based feedback for the current Develop draft. Passing requires a score **strictly above 7/10**; no particular score is guaranteed by this sample.
+3. If the score is 7 or below, review the AI's specific gaps and update the relevant Develop fields before checking again.
 
 ## Step 5 — Impact numbers
 
-The form accepts scores from **0 to 3**. These are sample estimates for exercising the form; replace them with locally approved estimates when using real data. The app displays the active minimum priority score and calculates the weighted result.
+The form accepts scores from **0 to 3**. The values below are **synthetic QA data for exercising the form only**; they are not measured bank facts, approved estimates, or evidence for AI validation. These values and their explanations are collected after AI validation and contribute to the **priority score only**. Replace them with locally approved estimates when using real data. The app displays the active minimum priority score and calculates the weighted result.
 
 | Field | Score | Explanation |
 |---|---:|---|
@@ -53,7 +55,7 @@ The form accepts scores from **0 to 3**. These are sample estimates for exercisi
 
 ## Before submitting
 
-- Confirm the live priority result meets the minimum shown by the form. If the minimum has been raised above this sample's result, adjust the estimates using evidence or approved assumptions.
+- Confirm the live priority result meets the minimum shown by the form. If the minimum has been raised above this sample's result, use evidence or approved assumptions to set the impact scores; do not present synthetic QA values as bank facts.
 - Run AI validation against the latest draft version. Editing the draft after validation requires another validation run.
-- Complete all five reviewer answers and all three impact scores and explanations before submitting.
+- Complete all five reviewer answers and all three impact scores and explanations before submitting. Reviewer answers and impact scores are collected after AI validation; only the impact scores contribute to the priority score.
 - Use internal, non-sensitive examples. Do not enter account numbers, customer names, card data, live payment references, credentials, or other restricted information.

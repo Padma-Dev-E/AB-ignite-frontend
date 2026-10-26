@@ -2009,7 +2009,7 @@ function LegacyIdeaDetailPage({ onBack }: { onBack: () => void }) {
           {[
             "Submitted",
             "Business review",
-            "Control review",
+            "Review",
             "Confirmation",
             "Proof of concept",
             "Implementation",

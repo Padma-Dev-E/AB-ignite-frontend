@@ -14,8 +14,10 @@ COPY public ./public
 COPY auth.ts middleware.ts next-env.d.ts next.config.mjs postcss.config.js tailwind.config.ts tsconfig.json ./
 ARG NEXT_PUBLIC_AUTH_REFRESH_INTERVAL_SECONDS=600
 ARG API_INTERNAL_URL=http://api:4100
+ARG AUTH_URL=http://localhost:3100
 ENV NEXT_PUBLIC_AUTH_REFRESH_INTERVAL_SECONDS=${NEXT_PUBLIC_AUTH_REFRESH_INTERVAL_SECONDS} \
     API_INTERNAL_URL=${API_INTERNAL_URL} \
+    AUTH_URL=${AUTH_URL} \
     NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

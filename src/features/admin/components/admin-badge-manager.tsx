@@ -58,7 +58,6 @@ export function AdminBadgeManager() {
   const [pageIndex, setPageIndex] = useState(0);
   const [selected, setSelected] = useState<AdminBadge | null>(null);
   const [draft, setDraft] = useState<BadgeDraft>(blankDraft);
-  const [reason, setReason] = useState("");
   const [formError, setFormError] = useState("");
   const [success, setSuccess] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -74,7 +73,6 @@ export function AdminBadgeManager() {
     setDrawerOpen(true);
     setSelected(null);
     setDraft(blankDraft);
-    setReason("");
     setFormError("");
     setSuccess("");
     requestRef.current = null;
@@ -85,7 +83,6 @@ export function AdminBadgeManager() {
     setDrawerOpen(true);
     setSelected(badge);
     setDraft(draftFromBadge(badge));
-    setReason("");
     setFormError("");
     setSuccess("");
     requestRef.current = null;
@@ -106,10 +103,9 @@ export function AdminBadgeManager() {
       eventTypes: [...draft.eventTypes].sort(),
       minimumCount,
       active: draft.active,
-      reason: reason.trim(),
     };
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.code) || input.code.length > 80 || !input.name || input.name.length > 160 || !input.description || input.description.length > 500 || input.eventTypes.length < 1 || input.eventTypes.length > 10 || unknownEvents.length > 0 || !Number.isSafeInteger(minimumCount) || minimumCount < 1 || minimumCount > 1_000_000 || !input.reason || input.reason.length > 500) {
-      setFormError("Check the badge details, select configured event types, and provide an audited reason.");
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.code) || input.code.length > 80 || !input.name || input.name.length > 160 || !input.description || input.description.length > 500 || input.eventTypes.length < 1 || input.eventTypes.length > 10 || unknownEvents.length > 0 || !Number.isSafeInteger(minimumCount) || minimumCount < 1 || minimumCount > 1_000_000) {
+      setFormError("Check the badge details and select configured event types.");
       return;
     }
     setFormError("");
@@ -121,7 +117,6 @@ export function AdminBadgeManager() {
       requestRef.current = null;
       setSelected(saved);
       setDraft(draftFromBadge(saved));
-      setReason("");
       setSuccess(`Badge rule “${saved.name}” ${selected ? "updated" : "created"}.`);
       if (!selected) { setCursors([null]); setPageIndex(0); }
       await client.invalidateQueries({ queryKey: adminBadgeQueryKey });
@@ -135,7 +130,7 @@ export function AdminBadgeManager() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-medium">Badge rules</h2>
-          <p className="mt-1 text-sm text-muted">Recognise milestones from configured points events. Every change records an audited reason.</p>
+          <p className="mt-1 text-sm text-muted">Recognise milestones from configured points events. Changes are recorded automatically.</p>
         </div>
         <Button variant="primary" onClick={startCreate} disabled={save.isPending}>Add badge</Button>
       </div>
@@ -163,7 +158,7 @@ export function AdminBadgeManager() {
             )}
             <AdminPagination label="Badge rules" page={pageIndex + 1} pageSize={10} total={(pageIndex + 1) * 10 + (page.data.nextAfter === null ? 0 : 1)} busy={save.isPending || page.isFetching} onPageChange={number => { if (number === pageIndex + 2 && page.data.nextAfter !== null) { const next = page.data.nextAfter; setCursors(current => [...current.slice(0, pageIndex + 1), next]); setPageIndex(number - 1); } else if (number === pageIndex) setPageIndex(number - 1); }} />
           </div>
-          <AdminDrawer open={drawerOpen} onClose={() => !save.isPending && setDrawerOpen(false)} title={selected ? `Edit ${selected.name}` : "Create badge rule"} description="Every rule change records an audited reason." footer={<div className="flex gap-2"><Button variant="primary" type="submit" form="badge-rule-editor" disabled={save.isPending || availableEvents.length === 0}>{save.isPending ? "Saving…" : selected ? "Save badge rule" : "Create badge rule"}</Button>{selected && <Button disabled={save.isPending} onClick={() => { setDraft(draftFromBadge(selected)); setReason(""); setFormError(""); setSuccess(""); requestRef.current = null; }}>Discard edits</Button>}</div>}>
+          <AdminDrawer open={drawerOpen} onClose={() => !save.isPending && setDrawerOpen(false)} title={selected ? `Edit ${selected.name}` : "Create badge rule"} description="Changes are recorded automatically." footer={<div className="flex gap-2"><Button variant="primary" type="submit" form="badge-rule-editor" disabled={save.isPending || availableEvents.length === 0}>{save.isPending ? "Saving…" : selected ? "Save badge rule" : "Create badge rule"}</Button>{selected && <Button disabled={save.isPending} onClick={() => { setDraft(draftFromBadge(selected)); setFormError(""); setSuccess(""); requestRef.current = null; }}>Discard edits</Button>}</div>}>
           <form id="badge-rule-editor" className="space-y-4" onSubmit={(event) => void submit(event)}>
             <h3 className="font-medium">{selected ? `Edit ${selected.name}` : "New badge"}</h3>
             <fieldset className="space-y-4" disabled={save.isPending}>
@@ -179,7 +174,6 @@ export function AdminBadgeManager() {
               </div>
               <label className="block text-sm"><span className="field-label">Minimum events</span><input className="input mt-1 max-w-40" type="number" min="1" max="1000000" step="1" required value={draft.minimumCount} onChange={(event) => setDraft({ ...draft, minimumCount: event.target.value })} /></label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.active} onChange={(event) => setDraft({ ...draft, active: event.target.checked })} />Active badge rule</label>
-              <label className="block text-sm"><span className="field-label">Audited reason</span><textarea className="input mt-1 min-h-24 resize-y" required maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why this badge rule is being changed." /></label>
             </fieldset>
             {formError && <p className="text-sm text-[#d6336c]" role="alert">Save failed: {formError}</p>}
             {success && <p className="text-sm text-teal" role="status">{success}</p>}

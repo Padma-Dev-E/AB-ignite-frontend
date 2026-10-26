@@ -32,14 +32,12 @@ export function useAdminGovernanceDecision() {
     mutationFn: ({
       ideaId,
       action,
-      reason,
       businessOwnerId,
     }: {
       ideaId: number;
       action: GovernanceAction;
-      reason: string;
       businessOwnerId?: number;
-    }) => decideAdminIdea(ideaId, action, reason, businessOwnerId),
+    }) => decideAdminIdea(ideaId, action, undefined, businessOwnerId),
     onSuccess: () =>
       Promise.all([
         client.invalidateQueries({ queryKey: adminQueryKeys.screening }),
@@ -170,14 +168,12 @@ export function useAdminEvaluationDecision() {
     mutationFn: ({
       ideaId,
       action,
-      reason,
       controlName,
     }: {
       ideaId: number;
       action: EvaluationAction;
-      reason: string;
       controlName?: string;
-    }) => decideAdminEvaluation(ideaId, action, reason, controlName),
+    }) => decideAdminEvaluation(ideaId, action, undefined, controlName),
     onSuccess: (_data, variables) =>
       Promise.all([
         client.invalidateQueries({ queryKey: adminQueryKeys.evaluations }),

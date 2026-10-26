@@ -25,6 +25,7 @@ import { AdminRewardCatalogueManager } from "./admin-reward-catalogue-manager";
 import { AdminEvidenceExports, AuditCsvDownload, OperationsAnalytics } from "./admin-operations-evidence";
 import { AdminQueueTable } from "./admin-transformation-queues";
 import { AdminShell, visibleAdminViews, type AdminView } from "./admin-shell";
+import { AdminAiPrompts } from "./admin-ai-prompts";
 import type {
   AdminAuditEvent,
 } from "../types";
@@ -155,10 +156,10 @@ function GovernancePanel() {
   const [active, setActive] = useState("screening");
   return <div className="stack">
     <SectionHeading title="Ideas" detail="Live governance queues and decisions" />
-    <SectionTabs items={[...governanceItems, { id: "controls", label: "Control approvals" }]} active={active} onChange={setActive} />
+    <SectionTabs items={governanceItems} active={active} onChange={setActive} />
     {active === "screening" ? <AdminQueueTable kind="screening" title="Screening" detail="Accept an idea directly into proof of concept, route it to a business owner, return it, reject it or defer it." empty="No ideas are waiting for screening." />
       : active === "transformation" ? <AdminQueueTable kind="transformation" title="Transformation" detail="Owner-approved ideas appear here for final confirmation. Open an idea and choose Confirm and accept to start its proof of concept." empty="No ideas are waiting for confirmation." />
-      : <AdminEvaluation mode="control" />}
+      : null}
   </div>;
 }
 
@@ -307,12 +308,12 @@ function AuditTable({ filters }: { filters: Record<string, string> }) {
       {!events.length && <p className="text-sm text-muted">No audit events in the records loaded so far. Select Next to check the next page.</p>}
       <div className="overflow-x-auto rounded-xl border border-[var(--line)]"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-[var(--hover)] text-xs text-muted"><tr>{["#", "Action", "Target", "Actor", "When", "Details"].map(label => <th key={label} scope="col" className="px-3 py-2 font-medium">{label}</th>)}</tr></thead><tbody>
         {events.map((event: AdminAuditEvent) => (
-          <tr key={event.id} className="border-t border-[var(--line)]"><td className="px-3 py-2">{page * 10 + events.indexOf(event) + 1}</td><td className="px-3 py-2"><span className="pill">{event.action}</span></td><td className="px-3 py-2">{event.targetType ?? "event"} {event.targetId ?? ""}<span className="block max-w-[280px] truncate text-xs text-muted">{event.reason}</span></td><td className="px-3 py-2">{event.actorUserId ?? "system"}</td><td className="px-3 py-2 whitespace-nowrap">{dateLabel(event.createdAt)}</td><td className="px-3 py-2"><button type="button" className="btn btn-small" onClick={() => setSelected(event)}>View</button></td></tr>
+          <tr key={event.id} className="border-t border-[var(--line)]"><td className="px-3 py-2">{page * 10 + events.indexOf(event) + 1}</td><td className="px-3 py-2"><span className="pill">{event.action}</span></td><td className="px-3 py-2">{event.targetType ?? "event"} {event.targetId ?? ""}</td><td className="px-3 py-2">{event.actorUserId ?? "system"}</td><td className="px-3 py-2 whitespace-nowrap">{dateLabel(event.createdAt)}</td><td className="px-3 py-2"><button type="button" className="btn btn-small" onClick={() => setSelected(event)}>View</button></td></tr>
         ))}
       </tbody></table></div>
       <AdminPagination label="Audit trail" page={page + 1} pageSize={10} total={query.data?.pages[0]?.total ?? (records.length + (query.hasNextPage ? 1 : 0))} busy={query.isFetchingNextPage} onPageChange={number => { if (number <= pageCount) setPage(number - 1); else void nextPage(); }} />
       {query.error && <p role="alert" className="mt-3 text-sm text-pink">{queryMessage(query.error, "The next audit page could not be loaded.")}</p>}
-      <AdminDrawer open={selected !== null} onClose={() => setSelected(null)} title={selected?.action ?? "Audit event"} description={selected ? `${selected.targetType ?? "event"} ${selected.targetId ?? ""} · ${dateLabel(selected.createdAt)}` : undefined}><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-muted">Actor</dt><dd>{selected?.actorUserId ?? "system"}</dd></div><div><dt className="text-muted">Session</dt><dd>{selected?.sessionId ?? "—"}</dd></div><div><dt className="text-muted">IP hash</dt><dd className="break-all">{selected?.ipHash ?? "—"}</dd></div><div><dt className="text-muted">Reason</dt><dd>{selected?.reason ?? "—"}</dd></div><div className="sm:col-span-2"><dt className="text-muted">Metadata</dt><dd className="mt-1 break-words font-mono text-xs">{selected ? JSON.stringify(selected.metadata, null, 2) : "—"}</dd></div></dl></AdminDrawer>
+      <AdminDrawer open={selected !== null} onClose={() => setSelected(null)} title={selected?.action ?? "Audit event"} description={selected ? `${selected.targetType ?? "event"} ${selected.targetId ?? ""} · ${dateLabel(selected.createdAt)}` : undefined}><dl className="grid gap-4 text-sm sm:grid-cols-2"><div><dt className="text-muted">Actor</dt><dd>{selected?.actorUserId ?? "system"}</dd></div><div><dt className="text-muted">Session</dt><dd>{selected?.sessionId ?? "—"}</dd></div><div><dt className="text-muted">IP hash</dt><dd className="break-all">{selected?.ipHash ?? "—"}</dd></div><div className="sm:col-span-2"><dt className="text-muted">Metadata</dt><dd className="mt-1 break-words font-mono text-xs">{selected ? JSON.stringify(selected.metadata, null, 2) : "—"}</dd></div></dl></AdminDrawer>
     </Card>
   );
 }
@@ -329,7 +330,7 @@ function SettingsPanel() {
 export function AdminWorkspace({ email }: AdminWorkspaceProps) {
   const { data: session, status } = useSession();
   const [requestedView, setRequestedView] = useState<AdminView>("dashboard");
-  if (status === "loading") return <BrandLoading label="AB Ignite is checking your workspace" detail="Loading your secure back-office session…" />;
+  if (status === "loading") return <BrandLoading />;
   if (!session?.user) return <main className="min-h-screen bg-[#f8faff] p-6" role="alert">Your session has ended. Sign in to open the back office.</main>;
   const role = session.user.role;
   const views = visibleAdminViews(role);
@@ -347,6 +348,7 @@ export function AdminWorkspace({ email }: AdminWorkspaceProps) {
     case "rewards": content = <RewardsPanel />; break;
     case "users": content = <PeoplePanel currentUserId={currentUserId} />; break;
     case "settings": content = <SettingsPanel />; break;
+    case "ai-prompts": content = role === "back_office" ? <AdminAiPrompts /> : null; break;
     case "audit": content = <AuditPanel role={role} />; break;
   }
   return <AdminShell email={email} name={session.user.name} role={role} views={views} active={active} onNavigate={setRequestedView}>{content}</AdminShell>;

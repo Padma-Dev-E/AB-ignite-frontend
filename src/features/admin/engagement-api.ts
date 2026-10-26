@@ -28,7 +28,7 @@ function numberedPageUrl(path: string, page: number) {
 export const listAdminAnnouncements = (page = 1) => apiFetch<EngagementNumberedPage<AdminAnnouncement>>(numberedPageUrl("/api/admin/engagement/announcements", page));
 export const listAdminCampaigns = (page = 1) => apiFetch<EngagementNumberedPage<AdminCampaign>>(numberedPageUrl("/api/admin/engagement/campaigns", page));
 export const listManagedChallenges = (after: number | null = null) => apiFetch<EngagementPage<ManagedChallenge>>(pageUrl("/api/admin/learning/challenges", after));
-export function executeEngagementCommand({ command, reason, idempotencyKey }: { command: EngagementCommand; reason: string; idempotencyKey: string }) {
+export function executeEngagementCommand({ command, idempotencyKey }: { command: EngagementCommand; idempotencyKey: string }) {
   let path: string;
   let method = "PATCH";
   let input: Record<string, unknown>;
@@ -39,5 +39,6 @@ export function executeEngagementCommand({ command, reason, idempotencyKey }: { 
     case "challenge-create": path = "/api/admin/learning/challenges"; method = "POST"; input = { title: command.title, question: command.question, deadlineAt: command.deadlineAt, active: command.active }; break;
     case "challenge-close": path = `/api/admin/learning/challenges/${command.id}`; input = { active: false }; break;
   }
-  return apiFetch<{ id: number }>(path, { method, headers: { "content-type": "application/json", "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ ...input, reason }) });
+  const action = command.kind.replaceAll("-", " ");
+  return apiFetch<{ id: number }>(path, { method, headers: { "content-type": "application/json", "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ ...input, reason: `Automatically recorded admin action: ${action}.` }) });
 }

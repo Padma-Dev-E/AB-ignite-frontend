@@ -12,7 +12,7 @@ export const adminNavigation = [
   { id: "challenges", label: "Challenges" }, { id: "announcements", label: "Announcements" },
   { id: "rewards", label: "Rewards" },
   { id: "users", label: "Users" },
-  { id: "settings", label: "Workflow settings" }, { id: "audit", label: "Audit trail" },
+  { id: "settings", label: "Workflow settings" }, { id: "ai-prompts", label: "AI Prompts" }, { id: "audit", label: "Audit trail" },
 ] as const;
 export type AdminView = (typeof adminNavigation)[number]["id"];
 

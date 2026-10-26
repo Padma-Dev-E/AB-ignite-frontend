@@ -26,12 +26,12 @@ export async function listAdminRewards() {
   const response = await apiFetch<AdminReward[] | ListResponse<AdminReward>>("/api/admin/rewards");
   return Array.isArray(response) ? response : response.items;
 }
-export type AdminRewardInput = Pick<AdminReward, "name" | "description" | "kind" | "cost" | "emoji" | "active"> & { reason: string };
+export type AdminRewardInput = Pick<AdminReward, "name" | "description" | "kind" | "cost" | "emoji" | "active">;
 export function createAdminReward(input: AdminRewardInput) {
-  return apiFetch<{ reward: AdminReward; version: unknown }>("/api/admin/rewards", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+  return apiFetch<{ reward: AdminReward; version: unknown }>("/api/admin/rewards", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...input, reason: "Automatically recorded admin action: reward created." }) });
 }
 export function updateAdminReward(id: number, input: AdminRewardInput) {
-  return apiFetch<{ reward: AdminReward; version: unknown }>(`/api/admin/rewards/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+  return apiFetch<{ reward: AdminReward; version: unknown }>(`/api/admin/rewards/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...input, reason: "Automatically recorded admin action: reward updated." }) });
 }
 
 export function listAdminUsers() {
@@ -156,7 +156,7 @@ export type GovernanceAction =
 export function decideAdminIdea(
   ideaId: number,
   action: GovernanceAction,
-  reason: string,
+  reason?: string,
   businessOwnerId?: number,
   controlName?: string,
 ) {
@@ -170,7 +170,7 @@ export type EvaluationAction = "approve" | "return" | "not_recommended";
 export function decideAdminEvaluation(
   ideaId: number,
   action: EvaluationAction,
-  reason: string,
+  reason?: string,
   controlName?: string,
 ) {
   return decideAdminIdea(ideaId, action, reason, undefined, controlName);

@@ -84,14 +84,15 @@ export type IdeaValidation = {
   nextActions: Array<{ action: string; ownerRole: string }>;
   auditSummary?: string;
 };
-export type IdeaClarifyingQuestion = { id: string; question: string; reason: string; required: boolean; answerType: "text" | "number" | "boolean" | "date" | "choice" };
+export type IdeaQuestionTopic = "beneficiaries" | "current_process" | "needed" | "risks" | "success_measure";
+export type IdeaClarifyingQuestion = { id: string; topic?: IdeaQuestionTopic; question: string; reason: string; required: boolean; answerType: "text" | "number" | "boolean" | "date" | "choice" };
 export type IdeaQuestions = { completeness: number; questions: IdeaClarifyingQuestion[] };
-export type IdeaDevelopmentRun = { id: number; jobKey: "idea.enrich" | "idea.questions" | "idea.validate"; status: string; ideaVersionId: number; result: IdeaEnrichment | IdeaQuestions | IdeaValidation | null; createdAt: string; completedAt: string | null };
+export type IdeaDevelopmentRun = { id: number; jobKey: "idea.enrich" | "idea.questions" | "idea.validate"; status: string; ideaVersionId: number; result: IdeaEnrichment | IdeaQuestions | IdeaValidation | null; errorCode?: string | null; errorMessage?: string | null; createdAt: string; completedAt: string | null };
 export type IdeaSubmissionAnswers = Record<string, string>;
 export type IdeaSubmissionMetrics = { turnaround: number; volume: number; value: number; turnaroundExplanation?: string; volumeExplanation?: string; valueExplanation?: string };
 export type IdeaSubmissionInput = { answers: IdeaSubmissionAnswers; metrics: IdeaSubmissionMetrics; buildsOnId?: number; differentiation?: string };
 export type IdeaComment = { id: number; ideaId: number; authorId: number; body: string; createdAt: string; updatedAt: string; author: { id: number; name: string; department: string } | null };
 export type CommentListResponse = { items: IdeaComment[]; page: number; pageSize: number; total: number; totalPages: number };
 export type IdeaUpdateInput = Partial<Pick<Idea, "kind" | "title" | "summary" | "problem" | "solution" | "benefits" | "risks" | "category">> & { dataClassification?: "public" | "internal" | "confidential" | "restricted" };
-export type IdeaDetailResponse = { idea: Idea; comments: CommentListResponse; submission?: { answers: IdeaSubmissionAnswers; metrics: IdeaSubmissionMetrics; score: number; minimumScore: number; validationPassed: boolean; differentiation: string | null } | null };
+export type IdeaDetailResponse = { idea: Idea; versionId?: number; pendingSubmission?: { status: "queued" | "running" | "succeeded"; submitForHumanReview: boolean }; comments: CommentListResponse; submission?: { answers: IdeaSubmissionAnswers; metrics: IdeaSubmissionMetrics; score: number; minimumScore: number; validationPassed: boolean; differentiation: string | null } | null };
 export type SupportResponse = { supported: boolean; supports: number };

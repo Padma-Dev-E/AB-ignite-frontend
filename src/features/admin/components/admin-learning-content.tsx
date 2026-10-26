@@ -26,11 +26,11 @@ const field = "input mt-1 w-full min-w-0";
 const emptyArticle: ArticleInput = {
   title: "", summary: "", body: "", category: "Banking", categoryCode: "banking",
   topic: null, publisher: "AB Ignite", difficulty: "Beginner", readingMinutes: 5,
-  publishedLabel: null, url: null, published: false, contentType: "internal", reason: "",
+  publishedLabel: null, url: null, published: false, contentType: "internal",
 };
 const emptyQuiz: QuizInput = {
   title: "", categoryCode: "banking", level: "beginner", objective: "", passMark: 70,
-  pointsPerQuestion: 10, timeLimitSeconds: 600, questionCount: 1, reason: "",
+  pointsPerQuestion: 10, timeLimitSeconds: 600, questionCount: 1,
 };
 const quizCategories = [
   { code: "banking", label: "Banking" },
@@ -39,7 +39,7 @@ const quizCategories = [
 ] as const;
 const quizLevels = ["beginner", "intermediate", "advanced", "expert"] as const;
 const emptyQuestion = (sortOrder = 0, points = 10): QuestionInput => ({
-  prompt: "", topic: "Banking", sortOrder, points, reason: "",
+  prompt: "", topic: "Banking", sortOrder, points,
   options: [
     { optionKey: "a", label: "", sortOrder: 0, isCorrect: true },
     { optionKey: "b", label: "", sortOrder: 1, isCorrect: false },
@@ -62,8 +62,7 @@ export function validLink(input: ArticleInput) {
 
 export function validQuestion(input: QuestionInput) {
   const options = input.options;
-  return Boolean(input.prompt.trim() && input.topic.trim() && input.reason.trim())
-    && input.reason.trim().length <= 500
+  return Boolean(input.prompt.trim() && input.topic.trim())
     && Number.isInteger(input.sortOrder) && input.sortOrder >= 0 && input.sortOrder <= 1000
     && Number.isInteger(input.points) && input.points >= 1 && input.points <= 10000
     && options.length >= 2 && options.length <= 10
@@ -113,8 +112,6 @@ export function QuizManager() {
   const [showQuizForm, setShowQuizForm] = useState(false);
   const [status, setStatus] = useState("");
   const [lifecycleError, setLifecycleError] = useState("");
-  const [publishReason, setPublishReason] = useState("");
-  const [versionReason, setVersionReason] = useState("");
   const questions = useLearningQuestions(versionId);
 
   const quizPages = quizzes.data?.pages ?? [];
@@ -135,8 +132,6 @@ export function QuizManager() {
     setDraft(null);
     setStatus("");
     setLifecycleError("");
-    setPublishReason("");
-    setVersionReason("");
     save.reset();
     addQuestion.reset();
   }
@@ -154,7 +149,7 @@ export function QuizManager() {
     setSelectedId(question.id);
     setDraft({
       prompt: question.prompt, topic: question.topic, sortOrder: question.sortOrder,
-      points: question.points, reason: "",
+      points: question.points,
       options: question.options.map(({ optionKey, label, sortOrder, isCorrect }) => ({ optionKey, label, sortOrder, isCorrect })),
     });
     setStatus("");
@@ -166,19 +161,18 @@ export function QuizManager() {
     if (!draft || selectedId === null || versionId === null || readOnly || !validQuestion(draft)) return;
     setStatus("");
     try {
-      await save.mutateAsync({ id: selectedId, versionId, input: { ...draft, reason: draft.reason.trim() } });
-      setDraft({ ...draft, reason: "" });
+      await save.mutateAsync({ id: selectedId, versionId, input: draft });
       setStatus("Question saved and audited.");
     } catch { /* Mutation error is displayed below. */ }
   }
   async function createQuizSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!quizDraft.title.trim() || !quizDraft.categoryCode.trim() || !quizDraft.level.trim() || !quizDraft.objective.trim() || !quizDraft.reason.trim()) return;
+    if (!quizDraft.title.trim() || !quizDraft.categoryCode.trim() || !quizDraft.level.trim() || !quizDraft.objective.trim()) return;
     setStatus("");
     try {
       const created = await createQuiz.mutateAsync({
         ...quizDraft, title: quizDraft.title.trim(), categoryCode: quizDraft.categoryCode.trim(),
-        level: quizDraft.level.trim(), objective: quizDraft.objective.trim(), reason: quizDraft.reason.trim(),
+        level: quizDraft.level.trim(), objective: quizDraft.objective.trim(),
       });
       setQuizPage(0);
       selectVersion(created.versionId);
@@ -192,26 +186,25 @@ export function QuizManager() {
     if (versionId === null || selectedId !== null || readOnly || !draft || !validQuestion(draft)) return;
     setStatus("");
     try {
-      await addQuestion.mutateAsync({ versionId, input: { ...draft, prompt: draft.prompt.trim(), topic: draft.topic.trim(), reason: draft.reason.trim() } });
+      await addQuestion.mutateAsync({ versionId, input: { ...draft, prompt: draft.prompt.trim(), topic: draft.topic.trim() } });
       setDraft(null);
       setStatus("Question added and audited.");
     } catch { /* Mutation error is displayed below. */ }
   }
   async function newVersion() {
-    if (!selectedQuiz?.published || !versionReason.trim() || versionReason.trim().length > 500) return;
+    if (!selectedQuiz?.published) return;
     setLifecycleError("");
     try {
-      const created = await createVersion.mutateAsync({ quizId: selectedQuiz.id, reason: versionReason.trim() });
+      const created = await createVersion.mutateAsync({ quizId: selectedQuiz.id });
       selectVersion(created.id);
       setStatus("New draft version created with a copy of the published questions.");
     } catch (cause) { setLifecycleError(message(cause)); }
   }
   async function publishVersion() {
-    if (!selectedQuiz || selectedQuiz.published || versionId === null || !publishReason.trim() || publishReason.trim().length > 500) return;
+    if (!selectedQuiz || selectedQuiz.published || versionId === null) return;
     setLifecycleError("");
     try {
-      await publish.mutateAsync({ versionId, reason: publishReason.trim() });
-      setPublishReason("");
+      await publish.mutateAsync({ versionId });
       setDraft(null);
       setSelectedId(null);
       setStatus("Quiz version published and locked.");
@@ -237,7 +230,6 @@ export function QuizManager() {
       <label className="text-sm">Planned questions<input className={field} type="number" min="1" max="100" required value={quizDraft.questionCount} onChange={(event) => setQuizDraft({ ...quizDraft, questionCount: Number(event.target.value) })} /></label>
       <label className="text-sm">Points per question<input className={field} type="number" min="1" max="10000" required value={quizDraft.pointsPerQuestion} onChange={(event) => setQuizDraft({ ...quizDraft, pointsPerQuestion: Number(event.target.value) })} /></label>
       <label className="text-sm">Time limit (seconds, at least 30)<input className={field} type="number" min="30" max="86400" value={quizDraft.timeLimitSeconds ?? ""} onChange={(event) => setQuizDraft({ ...quizDraft, timeLimitSeconds: event.target.value ? Number(event.target.value) : null })} /></label>
-      <label className="text-sm sm:col-span-2">Audited reason<textarea className={`${field} min-h-16`} maxLength={500} required value={quizDraft.reason} onChange={(event) => setQuizDraft({ ...quizDraft, reason: event.target.value })} /></label>
       <button className="btn-primary sm:col-span-2" disabled={createQuiz.isPending}>{createQuiz.isPending ? "Creating…" : "Create draft quiz"}</button>
       {createQuiz.isError && <p role="alert" className="text-pink sm:col-span-2">Create failed: {message(createQuiz.error)}</p>}
     </form>}
@@ -259,11 +251,9 @@ export function QuizManager() {
     {selectedQuiz && <div className="space-y-3 rounded-xl border p-3">
       <div><h3 className="font-semibold">{selectedQuiz.title}</h3><p className="mt-1 text-sm text-muted">Version {selectedQuiz.version} · {questions.isPending ? "Loading questions" : `${questionItems.length} of ${selectedQuiz.plannedQuestionCount} planned questions`} · {selectedQuiz.published ? "Published" : "Draft"}</p></div>
       {selectedQuiz.published ? <div className="flex flex-wrap items-end gap-2">
-        <label className="min-w-0 flex-1 text-sm">Reason for new draft<input className={field} maxLength={500} value={versionReason} onChange={(event) => setVersionReason(event.target.value)} /></label>
-        <button className="btn" type="button" onClick={() => void newVersion()} disabled={createVersion.isPending || !versionReason.trim()}>{createVersion.isPending ? "Creating…" : "Create draft version"}</button>
+        <button className="btn" type="button" onClick={() => void newVersion()} disabled={createVersion.isPending}>{createVersion.isPending ? "Creating…" : "Create draft version"}</button>
       </div> : <div className="flex flex-wrap items-end gap-2">
-        <label className="min-w-0 flex-1 text-sm">Reason for publishing<input className={field} maxLength={500} value={publishReason} onChange={(event) => setPublishReason(event.target.value)} /></label>
-        <button className="btn" type="button" onClick={() => void publishVersion()} disabled={publish.isPending || questions.isPending || questions.isError || questionItems.length !== selectedQuiz.plannedQuestionCount || !publishReason.trim()}>{publish.isPending ? "Publishing…" : "Publish version"}</button>
+        <button className="btn" type="button" onClick={() => void publishVersion()} disabled={publish.isPending || questions.isPending || questions.isError || questionItems.length !== selectedQuiz.plannedQuestionCount}>{publish.isPending ? "Publishing…" : "Publish version"}</button>
       </div>}
       {!selectedQuiz.published && <p className="text-xs text-muted">{questions.isPending ? "Checking questions…" : questionItems.length > selectedQuiz.plannedQuestionCount ? "This draft has more questions than planned and cannot be published." : questionItems.length < selectedQuiz.plannedQuestionCount ? `Add ${selectedQuiz.plannedQuestionCount - questionItems.length} more question${selectedQuiz.plannedQuestionCount - questionItems.length === 1 ? "" : "s"} before publishing. You can add extra questions too.` : "All planned questions are present. Publish now or add another question to extend the plan."}</p>}
     </div>}
@@ -310,7 +300,6 @@ export function QuizManager() {
           {!readOnly && <button type="button" className="btn btn-small mt-3" disabled={draft.options.length >= 10} onClick={() => setDraft(nextOption(draft))}>Add answer option</button>}
         </fieldset>
         {!readOnly && <>
-          <label className="block text-sm">Audited reason<textarea className={`${field} min-h-20`} value={draft.reason} maxLength={500} required onChange={(event) => setDraft({ ...draft, reason: event.target.value })} /></label>
           <button className="btn-primary" type="submit" disabled={save.isPending || addQuestion.isPending || !validQuestion(draft)}>{save.isPending || addQuestion.isPending ? "Saving…" : selectedId === null ? "Add question" : "Save question"}</button>
         </>}
         {(save.isError || addQuestion.isError) && <p role="alert" className="text-pink">Save failed: {message(save.error ?? addQuestion.error)}</p>}
@@ -363,7 +352,6 @@ export function ArticleManager() {
       topic: article.topic, publisher: article.publisher, difficulty: article.difficulty,
       readingMinutes: article.readingMinutes, publishedLabel: article.publishedLabel,
       url: article.url, published: article.published, contentType: article.contentType,
-      reason: "",
     });
     setEditorOpen(true);
     setStatus("");
@@ -371,18 +359,17 @@ export function ArticleManager() {
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!draft.reason.trim() || draft.reason.trim().length > 500 || !validLink(draft)) return;
+    if (!validLink(draft)) return;
     setStatus("");
     try {
       const wasNew = selectedId === null;
       const saved = await save.mutateAsync({ id: selectedId, input: {
         ...draft, title: draft.title.trim(), summary: draft.summary.trim(), body: draft.body.trim(),
         category: draft.category.trim(), categoryCode: draft.categoryCode.trim(), publisher: draft.publisher.trim(),
-        difficulty: draft.difficulty.trim(), reason: draft.reason.trim(),
+        difficulty: draft.difficulty.trim(),
         url: draft.contentType === "internal" ? null : draft.url?.trim() ?? null,
       } });
       setSelectedId(saved.id);
-      setDraft({ ...draft, reason: "" });
       if (wasNew) setArticlePage(0);
       setStatus(`Article “${saved.title}” saved and audited.`);
     } catch { /* Mutation error is displayed below. */ }
@@ -405,10 +392,10 @@ export function ArticleManager() {
     {!articleItems.length ? <p className="rounded-xl border border-dashed border-[var(--line)] p-5 text-sm text-muted">{allArticleItems.length ? "No articles match these filters." : "No articles yet. Use “Add article” to create the first one."}</p> : <div className="overflow-x-auto rounded-xl border border-[var(--line)]"><table className="w-full min-w-[680px] text-left text-sm"><thead className="bg-[var(--hover)] text-xs text-muted"><tr><th className="px-3 py-2">Article</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Reading</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Action</th></tr></thead><tbody>{articleItems.map((article) => <tr key={article.id} className="border-t border-[var(--line)]"><td className="max-w-xs truncate px-3 py-3 font-medium" title={article.title}>{article.title}</td><td className="px-3 py-3">{article.category}</td><td className="px-3 py-3">{article.contentType === "external" ? "External link" : "Internal"}</td><td className="px-3 py-3">{article.readingMinutes} min</td><td className="px-3 py-3"><span className={`pill ${article.published ? "text-teal" : "text-sand"}`}>{article.published ? "Published" : "Draft"}</span></td><td className="px-3 py-3"><button className="btn btn-small" type="button" onClick={() => select(article)}>Edit</button></td></tr>)}</tbody></table></div>}
     <AdminPagination label="Articles" page={articlePage + 1} pageSize={10} total={filteredArticles.length + (articles.hasNextPage && !articleSearch && articleCategory === "all" && articleStatus === "all" ? 10 : 0)} busy={articles.isFetchingNextPage} onPageChange={(page) => { if (page > articlePages.length && articles.hasNextPage) void nextArticlePage(); else changeArticlePage(page - 1); }} />
     {articles.isFetchNextPageError && <p role="alert" className="text-pink">Could not load the next article page. Select Next to retry.</p>}
-    <AdminDrawer open={editorOpen} onClose={() => { setEditorOpen(false); setStatus(""); save.reset(); }} title={selectedId === null ? "Add article" : `Edit ${draft.title}`} description="Save as a draft or publish it for employees. Every change needs an audited reason.">
+    <AdminDrawer open={editorOpen} onClose={() => { setEditorOpen(false); setStatus(""); save.reset(); }} title={selectedId === null ? "Add article" : `Edit ${draft.title}`} description="Save as a draft or publish it for employees.">
     {status && <p role="status" className="mb-3 text-teal">{status}</p>}
     {editorOpen && <form className="min-w-0 space-y-4" onSubmit={(event) => void submit(event)}>
-      <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-lg font-semibold">{selectedId === null ? "Add article" : `Edit ${draft.title}`}</h3><p className="mt-1 text-xs text-muted">Save as a draft or publish it for employees. Every change needs an audited reason.</p></div><button type="button" className="btn btn-small" onClick={() => { setEditorOpen(false); setStatus(""); save.reset(); }}>Close editor</button></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-lg font-semibold">{selectedId === null ? "Add article" : `Edit ${draft.title}`}</h3><p className="mt-1 text-xs text-muted">Save as a draft or publish it for employees.</p></div><button type="button" className="btn btn-small" onClick={() => { setEditorOpen(false); setStatus(""); save.reset(); }}>Close editor</button></div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block min-w-0 text-sm sm:col-span-2">Title<input className={field} required maxLength={240} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="For example: Protecting customer data" /></label>
         <label className="block min-w-0 text-sm sm:col-span-2">Short summary<textarea className={`${field} min-h-20`} required maxLength={2000} value={draft.summary} onChange={(event) => setDraft({ ...draft, summary: event.target.value })} placeholder="What will the reader learn?" /></label>
@@ -427,8 +414,7 @@ export function ArticleManager() {
         {draft.categoryCode === "other" && <label className="block min-w-0 text-sm">Category name<input className={field} required maxLength={100} value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} /></label>}
       </div></details>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.published} onChange={(event) => setDraft({ ...draft, published: event.target.checked })} />Publish for employees when saved</label>
-      <label className="block text-sm">Reason for this change<textarea className={`${field} min-h-16`} maxLength={500} required value={draft.reason} onChange={(event) => setDraft({ ...draft, reason: event.target.value })} placeholder="For example: Reviewed by the learning team" /></label>
-      <button className="btn-primary" type="submit" disabled={save.isPending || !draft.reason.trim() || !validLink(draft)}>{save.isPending ? "Saving…" : draft.published ? "Save and publish article" : "Save draft article"}</button>
+      <button className="btn-primary" type="submit" disabled={save.isPending || !validLink(draft)}>{save.isPending ? "Saving…" : draft.published ? "Save and publish article" : "Save draft article"}</button>
       {save.isError && <p role="alert" className="text-pink">Save failed: {message(save.error)}</p>}
     </form>}
     </AdminDrawer>

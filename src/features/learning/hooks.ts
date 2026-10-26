@@ -45,6 +45,8 @@ export function useSubmitQuizAttempt() {
     client.setQueryData<import("./types").AttemptResponse>(learningQueryKeys.attempt(variables.attemptId), (current) => current ? { ...current, attempt: { ...current.attempt, status: data.result.status }, result: data.result, topics: data.topics, answerReview: data.answerReview } : current);
     void client.invalidateQueries({ queryKey: learningQueryKeys.attempt(variables.attemptId) });
     void client.invalidateQueries({ queryKey: learningQueryKeys.journey() });
+    void client.invalidateQueries({ queryKey: learningQueryKeys.recommendations() });
+    void client.invalidateQueries({ queryKey: learningQueryKeys.quizzes() });
     void refreshPointsSummary(client);
   } });
 }
