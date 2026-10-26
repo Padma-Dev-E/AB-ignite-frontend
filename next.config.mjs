@@ -1,8 +1,20 @@
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 
+function normalizeBasePath(value = "") {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "/") return "";
+  const segments = trimmed.split("/").filter(Boolean);
+  if (segments.some((segment) => !/^[A-Za-z0-9._~-]+$/.test(segment) || segment === "." || segment === "..")) {
+    throw new Error("NEXT_PUBLIC_BASE_PATH must contain only URL path segments, without a query or fragment.");
+  }
+  return `/${segments.join("/")}`;
+}
+
 /** @returns {import('next').NextConfig} */
 export default function nextConfig(phase) {
+  const basePath = normalizeBasePath(process.env.NEXT_PUBLIC_BASE_PATH);
   return {
+    basePath,
     outputFileTracingRoot: process.cwd(),
     // A production build must never overwrite a running dev server's assets.
     distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
@@ -98,7 +110,12 @@ export default function nextConfig(phase) {
       ];
 
       return {
-        beforeFiles: paths.map((path) => ({ source: path, destination: `${api}${path}` })),
+        beforeFiles: paths.map((path) => ({
+          source: `${basePath}${path}`,
+          destination: `${api}${path}`,
+          // The source is explicitly prefixed above, and backend paths stay at /api/*.
+          basePath: false,
+        })),
       };
     },
   };

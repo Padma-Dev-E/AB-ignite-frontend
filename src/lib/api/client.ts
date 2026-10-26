@@ -1,5 +1,6 @@
 import type { ApiEnvelope, PriorityRejectionDetails } from "./contracts";
 import { activeSessionRefresh, refreshSession } from "../../auth/client-refresh";
+import { withBasePath } from "../routing/base-path";
 
 export class ApiError extends Error {
   constructor(public readonly code: string, message: string, public readonly status: number, public readonly requestId?: string, public readonly details?: PriorityRejectionDetails) {
@@ -63,13 +64,14 @@ export async function parseApiResponse<T>(response: Response): Promise<T> {
 
 /** Pass JSON-stringified bodies (and their content type) through RequestInit. */
 export async function apiFetch<T>(input: string, init: RequestInit = {}): Promise<T> {
+  const requestUrl = withBasePath(input);
   const headers = new Headers(init.headers);
   if (!headers.has("accept")) headers.set("accept", "application/json");
-  const request = () => fetch(input, { credentials: "same-origin", cache: "no-store", ...init, headers });
+  const request = () => fetch(requestUrl, { credentials: "same-origin", cache: "no-store", ...init, headers });
   const pendingRefresh = activeSessionRefresh();
   if (pendingRefresh) await pendingRefresh;
   let response = await request();
-  if (response.status === 401 && input !== "/api/auth/refresh" && await refreshSession()) {
+  if (response.status === 401 && requestUrl !== withBasePath("/api/auth/refresh") && await refreshSession()) {
     response = await request();
   }
   return parseApiResponse<T>(response);

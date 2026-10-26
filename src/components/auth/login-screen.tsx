@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Button, Card, Field } from "../ui";
+import { withBasePath } from "../../lib/routing/base-path";
 
 export function LoginScreen({ onCredentials }: { onCredentials: (credentials: { email: string; password: string }) => Promise<void> }) {
   const [email, setEmail] = useState("");
@@ -29,7 +30,7 @@ export function LoginScreen({ onCredentials }: { onCredentials: (credentials: { 
 
   return <main className="login-background grid min-h-screen place-items-center p-4 sm:p-6">
     <Card as="div" className="relative z-10 w-full max-w-[460px] overflow-hidden p-0">
-      <div className="bg-navy leading-[0]"><img src="/brand-header.jpg" alt="AB Ignite" className="block h-auto w-full" /></div>
+      <div className="bg-navy leading-[0]"><img src={withBasePath("/brand-header.jpg")} alt="AB Ignite" className="block h-auto w-full" /></div>
       <div className="p-6 sm:px-7 sm:pb-7">
         <h1 className="text-[28px] font-medium tracking-[-.02em]">Sign in</h1>
         <p className="mt-[-2px] text-[15px] text-muted">Share ideas, improve what exists, and shape what’s next.</p>

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Button, Card } from "../ui";
 import { passwordInput, passwordPolicyHint } from "../../features/account/password-policy";
+import { withBasePath } from "../../lib/routing/base-path";
 
 export function FirstLoginPasswordChange({ onChangePassword }: { onChangePassword: (input: { currentPassword: string; newPassword: string }) => Promise<void> }) {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -36,7 +37,7 @@ export function FirstLoginPasswordChange({ onChangePassword }: { onChangePasswor
 
   return <main className="login-background grid min-h-screen place-items-center p-4 sm:p-6">
     <Card as="div" className="w-full max-w-[460px] overflow-hidden p-0">
-      <div className="bg-navy leading-[0]"><img src="/brand-header.jpg" alt="AB Ignite" className="block h-auto w-full" /></div>
+      <div className="bg-navy leading-[0]"><img src={withBasePath("/brand-header.jpg")} alt="AB Ignite" className="block h-auto w-full" /></div>
       <div className="p-6 sm:px-7 sm:pb-7">
         <h1 className="text-[28px] font-medium tracking-[-.02em]">Change your password</h1>
         <p className="mt-1 text-sm leading-6 text-muted">Set a new password to continue. You’ll be asked to sign in again after it is changed.</p>

@@ -2,11 +2,14 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig, canAccessAdminWorkspace, forcedPasswordChangePathAllowed, postLoginPath } from "./src/auth/config";
 import { stripSessionCookie } from "./src/auth/session-cookies";
+import { appBasePath, stripBasePath, withBasePath } from "./src/lib/routing/base-path";
 
 const { auth } = NextAuth(authConfig);
 
 const authorizeRequest = auth((request) => {
-  const pathname = request.nextUrl.pathname;
+  const basePath = request.nextUrl.basePath || appBasePath;
+  const pathname = stripBasePath(request.nextUrl.pathname, basePath);
+  const redirectTo = (path: string) => NextResponse.redirect(new URL(withBasePath(path, basePath), request.url));
   const session = request.auth;
   const retiredDemoSession = Boolean(session?.user?.email?.endsWith("@demo.abignite.invalid"));
 
@@ -15,20 +18,20 @@ const authorizeRequest = auth((request) => {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: { code: "unauthorized", message: "Authentication required." } }, { status: 401 });
     }
-    if (pathname !== "/login") return NextResponse.redirect(new URL("/login", request.url));
+    if (pathname !== "/login") return redirectTo("/login");
   }
 
   if (pathname === "/") {
     const destination = session?.user?.mustChangePassword
       ? "/change-password"
       : session?.user ? postLoginPath(session.user.role) : "/login";
-    return NextResponse.redirect(new URL(destination, request.url));
+    return redirectTo(destination);
   }
 
   if (pathname === "/change-password") {
-    if (!session?.user) return NextResponse.redirect(new URL("/login", request.url));
+    if (!session?.user) return redirectTo("/login");
     if (!session.user.mustChangePassword) {
-      return NextResponse.redirect(new URL(postLoginPath(session.user.role), request.url));
+      return redirectTo(postLoginPath(session.user.role));
     }
   }
 
@@ -36,28 +39,27 @@ const authorizeRequest = auth((request) => {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: { code: "PASSWORD_CHANGE_REQUIRED", message: "Change your password before continuing." } }, { status: 403 });
     }
-    return NextResponse.redirect(new URL("/change-password", request.url));
+    return redirectTo("/change-password");
   }
 
   const authenticatedLogin = pathname === "/login" && Boolean(session?.user && session.isValid !== false && !retiredDemoSession);
   if (authenticatedLogin && session?.user) {
-    return NextResponse.redirect(new URL(
+    return redirectTo(
       session.user.mustChangePassword ? "/change-password" : postLoginPath(session.user.role),
-      request.url,
-    ));
+    );
   }
 
   if (pathname.startsWith("/private") && !session?.user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return redirectTo("/login");
   }
 
   if (pathname.startsWith("/admin")) {
-    if (!session?.user) return NextResponse.redirect(new URL("/login", request.url));
-    if (!canAccessAdminWorkspace(session.user.role)) return NextResponse.redirect(new URL("/private", request.url));
+    if (!session?.user) return redirectTo("/login");
+    if (!canAccessAdminWorkspace(session.user.role)) return redirectTo("/private");
   }
 
   if (pathname.startsWith("/private/admin") && !canAccessAdminWorkspace(session?.user?.role)) {
-    return NextResponse.redirect(new URL("/private", request.url));
+    return redirectTo("/private");
   }
 
   return NextResponse.next();

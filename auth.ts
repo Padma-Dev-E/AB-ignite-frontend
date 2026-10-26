@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { encode } from "next-auth/jwt";
 import { accessTokenTtlSeconds, authConfig, authSecret, refreshTokenTtlSeconds, SESSION_COOKIE_NAME } from "./src/auth/config";
 import { stripSessionCookie } from "./src/auth/session-cookies";
+import { appBasePath, stripBasePath } from "./src/lib/routing/base-path";
 
 const apiUrl = (process.env.API_INTERNAL_URL ?? "http://api:4100").replace(/\/$/, "");
 const apiToken = process.env.INTERNAL_API_TOKEN ?? "";
@@ -95,10 +96,10 @@ const { GET, POST } = nextAuth.handlers;
 export const handlers = {
   GET: async (...args: Parameters<typeof GET>) => {
     const response = await GET(...args);
-    return args[0].nextUrl.pathname === "/api/auth/session" ? stripSessionCookie(response) : response;
+    return stripBasePath(args[0].nextUrl.pathname, args[0].nextUrl.basePath || appBasePath) === "/api/auth/session" ? stripSessionCookie(response) : response;
   },
   POST: async (...args: Parameters<typeof POST>) => {
     const response = await POST(...args);
-    return args[0].nextUrl.pathname === "/api/auth/session" ? stripSessionCookie(response) : response;
+    return stripBasePath(args[0].nextUrl.pathname, args[0].nextUrl.basePath || appBasePath) === "/api/auth/session" ? stripSessionCookie(response) : response;
   },
 };

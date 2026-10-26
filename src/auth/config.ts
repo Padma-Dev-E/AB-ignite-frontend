@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { appBasePath, stripBasePath, withBasePath } from "../lib/routing/base-path";
 export type UserRole = "employee" | "back_office" | "business_owner";
 
 // This cookie name is shared with Fastify so it can validate Auth.js sessions.
@@ -43,7 +44,7 @@ export const authConfig = {
   trustHost: true,
   secret: authSecret,
   providers: [],
-  pages: { signIn: "/login" },
+  pages: { signIn: withBasePath("/login") },
   session: { strategy: "jwt", maxAge: refreshTokenTtlSeconds },
   cookies: {
     sessionToken: {
@@ -70,7 +71,7 @@ export const authConfig = {
       return session;
     },
     authorized({ auth, request }) {
-      const pathname = request.nextUrl.pathname;
+      const pathname = stripBasePath(request.nextUrl.pathname, request.nextUrl.basePath || appBasePath);
       if (pathname === "/" || pathname === "/login") return true;
       // Let middleware route invalid and missing sessions to a clean login
       // screen instead of allowing the password-change page to render a form

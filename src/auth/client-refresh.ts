@@ -1,3 +1,5 @@
+import { withBasePath } from "../lib/routing/base-path";
+
 /** Shares one browser refresh across focus handling and protected API calls. */
 let inFlight: Promise<boolean> | null = null;
 
@@ -7,7 +9,7 @@ export function activeSessionRefresh(): Promise<boolean> | null {
 
 export function refreshSession(): Promise<boolean> {
   if (inFlight) return inFlight;
-  const performRefresh = () => fetch("/api/auth/refresh", {
+  const performRefresh = () => fetch(withBasePath("/api/auth/refresh"), {
     method: "POST",
     credentials: "same-origin",
     cache: "no-store",

@@ -16,4 +16,6 @@ The frontend owns the browser-facing Auth.js session. Credential verification an
 
 The frontend Compose file builds only this repository and loads this repository's `.env`. It joins the external private network `ab-ignite-local_api_private` created by the backend Compose file. Start the backend first, then run `docker compose up -d --build` from this repository. The frontend is available on `127.0.0.1:3100`; its server-side API requests use `http://api:4100` over the private network.
 
+To host the application below a URL prefix, set `NEXT_PUBLIC_BASE_PATH` in this repository's `.env` before building, for example `NEXT_PUBLIC_BASE_PATH=/ignite`, then rebuild the frontend image. The prefix is compiled into the Next.js build. Keep `AUTH_URL` set to the public origin only, such as `https://example.com`; the app adds the prefix to its browser-facing Auth.js endpoint. Leave `NEXT_PUBLIC_BASE_PATH` empty when the app is hosted at `/`.
+
 Only UI-facing helpers remain alongside the screens: password field feedback, permission-based visibility, and live idea-score/AI-progress previews. These improve interaction only; Fastify owns and rechecks the rules before changing data.

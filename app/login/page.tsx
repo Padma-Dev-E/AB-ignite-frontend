@@ -3,6 +3,7 @@
 import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { LoginScreen } from "../../src/components/auth/login-screen";
+import { withBasePath } from "../../src/lib/routing/base-path";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,7 +12,7 @@ export default function LoginPage() {
     const result = await signIn("credentials", { email, password, redirect: false });
     if (!result || result.error || !result.ok) throw new Error("Invalid email or password.");
 
-    const refresh = await fetch("/api/auth/refresh", { method: "POST", credentials: "same-origin" });
+    const refresh = await fetch(withBasePath("/api/auth/refresh"), { method: "POST", credentials: "same-origin" });
     if (!refresh.ok) throw new Error("Unable to establish a secure session.");
     const session = await getSession();
     if (!session?.user?.role) throw new Error("Unable to verify your account. Please sign in again.");

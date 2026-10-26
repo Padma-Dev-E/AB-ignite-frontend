@@ -64,6 +64,7 @@ import { EmployeeProfileCard } from "../src/features/employee/employee-profile";
 import { useEmployeeProfile } from "../src/features/employee/profile-hooks";
 import { PortalBrand, PortalTopBar, portalNavigationClass, portalNavigationItemClass, portalSidebarClass } from "../src/components/layout/portal-shell";
 import { logoutToLogin } from "../src/auth/logout";
+import { withBasePath } from "../src/lib/routing/base-path";
 
 type Page =
   | "community"
@@ -2180,16 +2181,16 @@ export default function Home(props: unknown) {
   const authenticate = async ({ email, password }: { email: string; password: string }) => {
     const result = await signIn("credentials", { email, password, redirect: false });
     if (!result || result.error || !result.ok) throw new Error("Invalid email or password.");
-    const refresh = await fetch("/api/auth/refresh", { method: "POST", credentials: "same-origin" });
+    const refresh = await fetch(withBasePath("/api/auth/refresh"), { method: "POST", credentials: "same-origin" });
     if (!refresh.ok) throw new Error("Unable to establish a secure session.");
     const session = await getSession();
     if (!session?.user?.role) throw new Error("Unable to verify your account. Please sign in again.");
     if (session?.user?.mustChangePassword) {
-      window.location.assign("/change-password");
+      window.location.assign(withBasePath("/change-password"));
       return;
     }
     const destination = session?.user?.role === "employee" ? "/private" : "/private/admin";
-    window.location.assign(destination);
+    window.location.assign(withBasePath(destination));
   };
   const signOut = async () => logoutToLogin();
   const navigate = (next: Page, preserveNotificationUrl = false) => {

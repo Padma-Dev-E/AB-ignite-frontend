@@ -1,4 +1,5 @@
 import { apiFetch } from "../../lib/api/client";
+import { withBasePath } from "../../lib/routing/base-path";
 import type {
   AdminAuditEvent,
   AdminChallenge,
@@ -85,7 +86,7 @@ export function adminExportUrl(
 ) {
   const params = new URLSearchParams(filterQuery(filters));
   params.set("limit", "1000");
-  return `/api/admin/${kind}/export?${params}`;
+  return withBasePath(`/api/admin/${kind}/export?${params}`);
 }
 export function listAdminScreening(limit = 50, after: number | null = null) {
   const params = new URLSearchParams({ limit: String(limit) });
