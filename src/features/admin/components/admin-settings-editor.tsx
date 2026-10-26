@@ -6,6 +6,7 @@ import { apiFetch } from "../../../lib/api/client";
 import { Button } from "../../../components/ui";
 import { useAdminSettings } from "../hooks";
 import { adminQueryKeys } from "../api";
+import { buildAdminSettingsPatch } from "../settings-payload";
 
 export type AdminSettingsEditorProps = {
   className?: string;
@@ -38,7 +39,8 @@ export function AdminSettingsEditor({ className = "" }: AdminSettingsEditorProps
     if (!pointRules && !levels) { setError("Change at least one setting before saving."); return; }
     setSaving(true); setError(""); setSuccess("");
     try {
-      await apiFetch("/api/admin/settings", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason: "Automatically recorded admin action: workflow settings updated.", ...(pointRules ? { pointRules } : {}), ...(levels ? { levels } : {}) }) });
+      const payload = buildAdminSettingsPatch({ reason: "Automatically recorded admin action: workflow settings updated.", ...(pointRules ? { pointRules } : {}), ...(levels ? { levels } : {}) });
+      await apiFetch("/api/admin/settings", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
       await client.invalidateQueries({ queryKey: adminQueryKeys.settings });
       setPointRules(null); setLevels(null); setSuccess("Settings saved and audited.");
     } catch (cause) { setError(message(cause)); }
