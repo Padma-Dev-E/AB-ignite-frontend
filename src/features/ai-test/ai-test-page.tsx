@@ -4,9 +4,10 @@ import { useState } from "react";
 import { withBasePath } from "../../lib/routing/base-path";
 
 type HeaderRow = { id: string; name: string; value: string };
+type OutboundHeader = { name: string; value: string };
 type TestResult = {
   requestId?: string;
-  request?: { method: string; url: string; headers: HeaderRow[]; body: string };
+  request?: { method: string; url: string; headers: OutboundHeader[]; hasBody: boolean; body: unknown };
   response?: {
     status: number;
     statusText: string;
@@ -32,6 +33,16 @@ export function AiTestPage() {
   async function sendRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setResult(null);
+    const hasBody = body.trim().length > 0;
+    let jsonBody: unknown = null;
+    if (hasBody) {
+      try {
+        jsonBody = JSON.parse(body);
+      } catch (error) {
+        setResult({ error: { name: "SyntaxError", message: error instanceof Error ? error.message : String(error) } });
+        return;
+      }
+    }
     setBusy(true);
     try {
       const response = await fetch(withBasePath("/api/ai-test"), {
@@ -41,7 +52,8 @@ export function AiTestPage() {
           url,
           method,
           headers: headers.filter((header) => header.name.trim()),
-          body,
+          hasBody,
+          body: jsonBody,
         }),
         cache: "no-store",
       });
@@ -146,20 +158,20 @@ export function AiTestPage() {
               <p className="mt-2 text-xs leading-5 text-[#718197]">No application headers are added automatically. The HTTP runtime supplies transport headers such as Host and Content-Length.</p>
             </div>
 
-            <label htmlFor="request-body" className="mb-1.5 mt-5 block text-sm font-medium">Raw request body</label>
+            <label htmlFor="request-body" className="mb-1.5 mt-5 block text-sm font-medium">JSON request body</label>
             <textarea
               id="request-body"
               spellCheck={false}
               value={body}
               onChange={(event) => setBody(event.target.value)}
-              placeholder="Optional. Enter the exact text to send. Set Content-Type above if needed."
+              placeholder={'Optional JSON, for example:\n{\n  "key": "value"\n}'}
               className="min-h-[240px] w-full resize-y rounded-xl border border-[#cbd6e2] bg-[#fbfcfe] px-3.5 py-3 font-mono text-[13px] leading-6 outline-none transition focus:border-[#1762a7] focus:ring-2 focus:ring-[#1762a7]/15"
             />
 
             <button type="submit" disabled={busy || !url.trim() || !method.trim()} className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#1762a7] px-5 text-sm font-semibold text-white transition hover:bg-[#104f8a] disabled:cursor-not-allowed disabled:opacity-55">
               {busy ? "Sending from Fastify…" : "Send request"}
             </button>
-            <p className="mt-3 text-xs leading-5 text-[#718197]">Sending requires a back-office session. Fastify can reach public and private service hosts; loopback, link-local, and reserved destinations are blocked.</p>
+            <p className="mt-3 text-xs leading-5 text-[#718197]">Enter valid JSON. Fastify sends it as JSON and adds Content-Type: application/json when you have not supplied that header. Sending requires a back-office session.</p>
           </section>
 
           <section className="min-h-[520px] rounded-2xl border border-[#dce4ed] bg-white p-5 shadow-[0_10px_30px_rgba(27,55,88,0.06)] sm:p-6" aria-live="polite">
