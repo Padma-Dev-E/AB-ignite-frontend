@@ -8,7 +8,6 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_AUTH_REFRESH_INTERVAL_SECONDS: ${NEXT_PUBLIC_AUTH_REFRESH_INTERVAL_SECONDS:-600}
-        API_INTERNAL_URL: http://api:4100
     env_file:
       - path: ./.env
         required: true
