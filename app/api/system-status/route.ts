@@ -26,6 +26,7 @@ export async function GET() {
       requestId, checkedAt, latencyMs: null,
       fastify: "misconfigured" satisfies CheckState,
       frontendAuth: "unknown" satisfies CheckState,
+      frontendAuthHttpStatus: null,
       ready: false,
     }, { headers: { "cache-control": "no-store" } });
   }
@@ -42,6 +43,7 @@ export async function GET() {
       requestId, checkedAt, latencyMs: Math.round(performance.now() - startedAt),
       fastify: "unreachable" satisfies CheckState,
       frontendAuth: "unknown" satisfies CheckState,
+      frontendAuthHttpStatus: null,
       ready: false,
     }, { headers: { "cache-control": "no-store" } });
   }
@@ -51,6 +53,7 @@ export async function GET() {
   const token = process.env.INTERNAL_API_TOKEN ?? "";
   const authSecret = process.env.AUTH_SECRET ?? "";
   const cookieName = process.env.AUTH_SESSION_COOKIE_NAME ?? "ab_ignite_session";
+  let frontendAuthHttpStatus: number | null = null;
   if (token.length >= 32 && authSecret.length >= 32 && cookieName) {
     try {
       const authResponse = await fetch(new URL("/internal/health", apiOrigin), {
@@ -62,6 +65,7 @@ export async function GET() {
         cache: "no-store",
         signal: AbortSignal.timeout(3000),
       });
+      frontendAuthHttpStatus = authResponse.status;
       frontendAuth = authResponse.ok ? "ready" : [404, 409].includes(authResponse.status) ? "misconfigured" : "unhealthy";
     } catch {
       frontendAuth = "unreachable";
@@ -70,7 +74,7 @@ export async function GET() {
 
   const fastify: CheckState = healthResponse.status === 200 ? "ready" : "unhealthy";
   return Response.json({
-    requestId, checkedAt, latencyMs, fastify, frontendAuth,
+    requestId, checkedAt, latencyMs, fastify, frontendAuth, frontendAuthHttpStatus,
     ready: fastify === "ready" && frontendAuth === "ready",
   }, { headers: { "cache-control": "no-store" } });
 }

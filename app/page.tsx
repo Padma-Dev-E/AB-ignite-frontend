@@ -20,7 +20,7 @@ import {
   StatTile,
 } from "../src/components/ui";
 import { LoginScreen as AuthLoginScreen } from "../src/components/auth/login-screen";
-import { loginFailureMessage, requireBackendReadyForLogin } from "../src/auth/backend-status-client";
+import { loginFailureMessage } from "../src/auth/backend-status-client";
 import {
   EmployeeCommunityPage,
   EmployeeIdeaDetailPage,
@@ -2180,7 +2180,6 @@ export default function Home(props: unknown) {
     return () => window.removeEventListener("popstate", restoreNotificationLocation);
   }, []);
   const authenticate = async ({ email, password }: { email: string; password: string }) => {
-    await requireBackendReadyForLogin();
     const result = await signIn("credentials", { email, password, redirect: false });
     if (!result || result.error || !result.ok) throw new Error(loginFailureMessage(result?.error));
     const refresh = await fetch(withBasePath("/api/auth/refresh"), { method: "POST", credentials: "same-origin" });

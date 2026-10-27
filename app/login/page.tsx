@@ -4,13 +4,12 @@ import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { LoginScreen } from "../../src/components/auth/login-screen";
 import { withBasePath } from "../../src/lib/routing/base-path";
-import { loginFailureMessage, requireBackendReadyForLogin } from "../../src/auth/backend-status-client";
+import { loginFailureMessage } from "../../src/auth/backend-status-client";
 
 export default function LoginPage() {
   const router = useRouter();
 
   async function authenticate({ email, password }: { email: string; password: string }) {
-    await requireBackendReadyForLogin();
     const result = await signIn("credentials", { email, password, redirect: false });
     if (!result || result.error || !result.ok) throw new Error(loginFailureMessage(result?.error));
 
