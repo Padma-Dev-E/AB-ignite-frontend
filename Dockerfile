@@ -13,18 +13,15 @@ COPY types ./types
 COPY public ./public
 COPY auth.ts middleware.ts next-env.d.ts next.config.mjs postcss.config.js tailwind.config.ts tsconfig.json ./
 ARG NEXT_PUBLIC_AUTH_REFRESH_INTERVAL_SECONDS=600
-ARG APP_URL
 ARG API_INTERNAL_URL=http://api:4100
 ENV NEXT_PUBLIC_AUTH_REFRESH_INTERVAL_SECONDS=${NEXT_PUBLIC_AUTH_REFRESH_INTERVAL_SECONDS} \
-    APP_URL=${APP_URL} \
     API_INTERNAL_URL=${API_INTERNAL_URL} \
     NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
-ARG APP_URL
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 APP_URL=${APP_URL}
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/.next ./.next
 COPY --from=build --chown=node:node /app/public ./public
