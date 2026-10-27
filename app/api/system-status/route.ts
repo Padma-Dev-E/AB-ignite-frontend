@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { createHmac } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,14 +49,20 @@ export async function GET() {
   const latencyMs = Math.round(performance.now() - startedAt);
   let frontendAuth: CheckState = "misconfigured";
   const token = process.env.INTERNAL_API_TOKEN ?? "";
-  if (token.length >= 32) {
+  const authSecret = process.env.AUTH_SECRET ?? "";
+  const cookieName = process.env.AUTH_SESSION_COOKIE_NAME ?? "ab_ignite_session";
+  if (token.length >= 32 && authSecret.length >= 32 && cookieName) {
     try {
       const authResponse = await fetch(new URL("/internal/health", apiOrigin), {
-        headers: { "x-internal-api-token": token },
+        headers: {
+          "x-internal-api-token": token,
+          "x-auth-config-proof": createHmac("sha256", authSecret).update("ab-ignite-session-config-check-v1").digest("hex"),
+          "x-session-cookie-name": cookieName,
+        },
         cache: "no-store",
         signal: AbortSignal.timeout(3000),
       });
-      frontendAuth = authResponse.ok ? "ready" : authResponse.status === 404 ? "misconfigured" : "unhealthy";
+      frontendAuth = authResponse.ok ? "ready" : [404, 409].includes(authResponse.status) ? "misconfigured" : "unhealthy";
     } catch {
       frontendAuth = "unreachable";
     }

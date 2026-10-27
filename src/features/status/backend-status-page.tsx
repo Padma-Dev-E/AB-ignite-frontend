@@ -67,11 +67,11 @@ export function BackendStatusPage() {
       </header>
       <section className="rounded-2xl border border-slate-200 bg-white px-5 shadow-[0_10px_30px_rgba(27,55,88,0.06)] sm:px-7" aria-live="polite" aria-busy={checking}>
         {row("Fastify API", status?.fastify ?? "unknown", status?.latencyMs === null || status?.latencyMs === undefined ? "Readiness ping and response time" : `Readiness ping · ${status.latencyMs} ms`)}
-        {row("Next.js internal API access", status?.frontendAuth ?? "unknown", "Confirms the frontend can authenticate to Fastify using the shared internal token")}
+        {row("Login configuration handshake", status?.frontendAuth ?? "unknown", "Checks the internal token, shared session secret, and cookie name without exposing their values")}
         <p className="py-4 text-xs text-slate-500">{status ? `Last checked ${new Date(status.checkedAt).toLocaleTimeString()}. Updates every 5 seconds.` : "Checking services…"}</p>
       </section>
       {status?.fastify === "unreachable" && <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">Next.js cannot connect to Fastify. Verify API_INTERNAL_URL points to the backend Kubernetes Service and that network policy permits TCP port 4100.</p>}
-      {status?.frontendAuth === "misconfigured" && <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">Fastify is reachable, but the internal token is missing or does not match. INTERNAL_API_TOKEN must be the same in both services.</p>}
+      {status?.frontendAuth === "misconfigured" && <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">Fastify is reachable, but the login configuration does not match. Check INTERNAL_API_TOKEN, AUTH_SECRET, and AUTH_SESSION_COOKIE_NAME in both services.</p>}
       {status?.fastify === "unhealthy" && <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">Fastify answered, but its readiness check failed. Check backend logs and database readiness.</p>}
       <a href={withBasePath("/login")} className="mt-6 inline-flex text-sm font-medium text-[#1762a7] underline underline-offset-4">Return to sign in</a>
     </div>

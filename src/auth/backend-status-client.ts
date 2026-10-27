@@ -22,7 +22,7 @@ export async function requireBackendReadyForLogin() {
     throw new Error("Next.js cannot reach Fastify. Check the frontend API_INTERNAL_URL and the backend Service/network settings. Open Service status for live details.");
   }
   if (status.frontendAuth === "misconfigured") {
-    throw new Error("Next.js reached Fastify, but the internal API token is missing or does not match. Check INTERNAL_API_TOKEN in both services.");
+    throw new Error("Next.js reached Fastify, but the login configuration does not match. Check INTERNAL_API_TOKEN, AUTH_SECRET, and AUTH_SESSION_COOKIE_NAME in both services.");
   }
   if (status.fastify !== "ready") {
     throw new Error("Fastify responded but is not ready. Check the backend health and database status on the Service status page.");
