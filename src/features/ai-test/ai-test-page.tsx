@@ -51,7 +51,9 @@ export function AiTestPage() {
         body: JSON.stringify({
           url,
           method,
-          headers: headers.filter((header) => header.name.trim()),
+          headers: headers
+            .filter((header) => header.name.trim())
+            .map(({ name, value }) => ({ name, value })),
           hasBody,
           body: jsonBody,
         }),
