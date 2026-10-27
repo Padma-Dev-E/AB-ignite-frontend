@@ -8,6 +8,16 @@ import { appBasePath, stripBasePath } from "./src/lib/routing/base-path";
 const apiUrl = (process.env.API_INTERNAL_URL ?? "http://api:4100").replace(/\/$/, "");
 const apiToken = process.env.INTERNAL_API_TOKEN ?? "";
 
+// APP_URL is the single public URL setting. Auth.js expects AUTH_URL to be the
+// origin here; the Next.js base path is compiled separately from APP_URL.path.
+if (process.env.APP_URL) {
+  try {
+    process.env.AUTH_URL = new URL(process.env.APP_URL).origin;
+  } catch {
+    throw new Error("APP_URL must be a valid absolute URL.");
+  }
+}
+
 async function internalApi(path: string, init: RequestInit = {}) {
   if (apiToken.length < 32) throw new Error("Internal API authentication is not configured.");
   return fetch(`${apiUrl}${path}`, {

@@ -14,7 +14,7 @@ export const accessTokenTtlSeconds = positiveSeconds("AUTH_ACCESS_TOKEN_TTL_SECO
 export const refreshTokenTtlSeconds = positiveSeconds("AUTH_REFRESH_TOKEN_TTL_SECONDS", 2_592_000);
 export const authSecret = process.env.AUTH_SECRET ?? (process.env.NODE_ENV === "production" ? "" : "local-development-secret-change-me");
 function shouldUseSecureCookies() {
-  const configuredUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
+  const configuredUrl = process.env.APP_URL ?? process.env.AUTH_URL ?? process.env.NEXTAUTH_URL;
   if (!configuredUrl) return process.env.NODE_ENV === "production";
   try {
     const url = new URL(configuredUrl);

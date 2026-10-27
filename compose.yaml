@@ -8,14 +8,16 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_AUTH_REFRESH_INTERVAL_SECONDS: ${NEXT_PUBLIC_AUTH_REFRESH_INTERVAL_SECONDS:-600}
-        NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-}
+        APP_URL: ${APP_URL:?Set APP_URL to the full public frontend URL}
         API_INTERNAL_URL: http://api:4100
-        AUTH_URL: ${AUTH_URL:-http://localhost:3100}
     env_file:
       - path: ./.env
         required: true
     environment:
       NODE_ENV: production
+      APP_URL: ${APP_URL:?Set APP_URL to the full public frontend URL}
+      # The Node Auth.js handler derives the origin from APP_URL. Keep legacy .env AUTH_URL values from overriding that.
+      AUTH_URL: ""
       API_INTERNAL_URL: http://api:4100
     init: true
     security_opt:
