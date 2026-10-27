@@ -36,12 +36,18 @@ const nextAuth = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const response = await internalApi("/internal/auth/credentials", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email: credentials?.email, password: credentials?.password }),
-        });
-        if (!response.ok) return null;
+        let response: Response;
+        try {
+          response = await internalApi("/internal/auth/credentials", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email: credentials?.email, password: credentials?.password }),
+          });
+        } catch {
+          throw new Error("BACKEND_UNAVAILABLE");
+        }
+        if (response.status === 401) return null;
+        if (!response.ok) throw new Error(`BACKEND_AUTH_FAILED_${response.status}`);
         const result = await response.json() as { user?: Record<string, unknown> };
         const user = result.user;
         if (!user || typeof user.id !== "string" || typeof user.role !== "string") return null;

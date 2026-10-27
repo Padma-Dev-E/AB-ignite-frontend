@@ -90,6 +90,7 @@ export function AiTestPage() {
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[#64758b]">
             Send a JSON request from the backend network and inspect the upstream HTTP response. This page does not use or change the application Gemini SDK flow.
           </p>
+          <a href={withBasePath("/status")} className="mt-3 inline-flex text-sm font-medium text-[#1762a7] underline underline-offset-4">Check Next.js ↔ Fastify connection</a>
         </header>
 
         <form onSubmit={sendRequest} className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

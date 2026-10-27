@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Button, Card, Field } from "../ui";
 import { withBasePath } from "../../lib/routing/base-path";
+import { loginThrownErrorMessage } from "../../auth/backend-status-client";
 
 export function LoginScreen({ onCredentials }: { onCredentials: (credentials: { email: string; password: string }) => Promise<void> }) {
   const [email, setEmail] = useState("");
@@ -22,7 +23,7 @@ export function LoginScreen({ onCredentials }: { onCredentials: (credentials: { 
     try {
       await onCredentials({ email: normalizedEmail, password });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to sign in. Please try again.");
+      setError(loginThrownErrorMessage(cause));
     } finally {
       setPending(false);
     }
@@ -39,6 +40,7 @@ export function LoginScreen({ onCredentials }: { onCredentials: (credentials: { 
           <Field label="Password" type="password" value={password} onChange={setPassword} className="mt-3" required />
           {error && <p className="mt-3 text-[13.5px] font-medium text-[#c22b45]" role="alert">{error}</p>}
           <Button type="submit" variant="primary" className="mt-3 w-full" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</Button>
+          <p className="mt-4 text-center text-sm text-muted"><a className="font-medium text-blue underline underline-offset-4" href={withBasePath("/status")}>Check service status</a></p>
         </form>
       </div>
     </Card>
