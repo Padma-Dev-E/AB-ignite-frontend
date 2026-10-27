@@ -18,4 +18,12 @@ The frontend Compose file builds only this repository and loads this repository'
 
 Set `APP_URL` in this repository's `.env` to the complete public frontend URL, including any path prefix. Examples: `http://localhost:3100` for local root hosting, `https://company.com` for production root hosting, or `https://company.com/ab-ignite` for production under a path. The frontend derives the Next.js base path and Auth.js public origin from this single value. Because Next.js embeds its base path in the build, rebuild the frontend image after changing `APP_URL`.
 
+For Kubernetes or another image registry build, pass the public URL as a **build argument** and set the same value as a runtime environment variable. The Dockerfile intentionally has no `APP_URL` default, so an image cannot silently bake in a root or localhost path:
+
+```sh
+docker build --build-arg APP_URL=https://company.com/ab-ignite -t ab-ignite-frontend:release .
+```
+
+Set the frontend Deployment's `APP_URL` to that same URL, and set `API_INTERNAL_URL` to the Kubernetes Service DNS address for Fastify, such as `http://ab-ignite-backend:4100`. Configure the Ingress to preserve `/ab-ignite` when forwarding requests to the frontend container on port `3000`; the frontend handles that prefix itself.
+
 Only UI-facing helpers remain alongside the screens: password field feedback, permission-based visibility, and live idea-score/AI-progress previews. These improve interaction only; Fastify owns and rechecks the rules before changing data.
