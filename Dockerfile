@@ -25,7 +25,8 @@ RUN npm run build
 
 FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_BASE_PATH=
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
 COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/.next ./.next
 COPY --from=build --chown=node:node /app/public ./public

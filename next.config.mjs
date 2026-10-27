@@ -27,6 +27,7 @@ export default function nextConfig(phase) {
         "/api/account/password",
         "/api/account/password/statement",
         "/api/account/profile",
+        "/api/ai-test",
         "/api/admin/ai/runs",
         "/api/admin/ai-prompts",
         "/api/admin/ai-prompts/:jobKey",
