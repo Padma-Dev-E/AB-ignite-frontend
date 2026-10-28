@@ -35,7 +35,7 @@ export function AdminDelivery() {
       })}</tbody></table></div> : <p className="rounded-xl border border-[var(--line)] p-5 text-sm text-muted">No ideas have entered delivery yet.</p>}
       <AdminPagination page={page + 1} pageSize={10} total={(page + 1) * 10 + (query.data?.nextAfter == null ? 0 : 1)} busy={query.isFetching} label="Delivery ideas" onPageChange={number => { if (number === page + 2 && query.data?.nextAfter != null) { const after = query.data.nextAfter; setCursors(current => [...current.slice(0, page + 1), after]); setPage(number - 1); } else if (number === page) setPage(number - 1); }} />
     </>}
-    <AdminDrawer open={detail !== null} onClose={() => setDetail(null)} title={detail?.title ?? "Delivery idea"} description={detail ? `${detail.reference} · ${detail.status.replaceAll("_", " ")}` : undefined}>
+    <AdminDrawer open={detail !== null} onClose={() => setDetail(null)} title={detail?.title ?? "Delivery idea"} description={detail ? `${detail.reference} · ${detail.status.replaceAll("_", " ")}` : undefined} width="idea">
       {detailQuery.isPending ? <div role="status" aria-busy="true" className="p-5 text-sm text-muted">Loading full idea details…</div>
         : detailQuery.isError ? <div role="alert" className="rounded-xl border border-pink/40 p-4 text-sm"><p>Full idea details could not be loaded: {detailQuery.error instanceof Error ? detailQuery.error.message : "Request failed."}</p><button type="button" className="btn btn-small mt-3" onClick={() => void detailQuery.refetch()}>Try again</button></div>
           : detailQuery.data ? <AdminIdeaFullDetail detail={detailQuery.data} /> : null}

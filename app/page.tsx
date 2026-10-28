@@ -414,6 +414,8 @@ function Notifications({
   onMarkAllRead,
   onMarkRead,
   onOpenNotification,
+  markingReadId,
+  markingAllRead,
 }: {
   open: boolean;
   onClose: () => void;
@@ -428,6 +430,8 @@ function Notifications({
   onMarkAllRead: () => void;
   onMarkRead: (id: number) => void;
   onOpenNotification: (notification: Notification) => void;
+  markingReadId?: number;
+  markingAllRead?: boolean;
 }) {
   return (
     <Transition show={open} as={Fragment}>
@@ -461,9 +465,9 @@ function Notifications({
               <button
                 className="btn btn-small"
                 onClick={onMarkAllRead}
-                disabled={!unreadCount}
+                disabled={!unreadCount || markingAllRead}
               >
-                Mark all read
+                {markingAllRead ? "Marking…" : "Mark all read"}
               </button>
             </div>
             <div className="max-h-[min(72vh,40rem)] overflow-y-auto">
@@ -506,7 +510,7 @@ function Notifications({
                               <span className="block text-[13px] text-muted">{item.body}</span>
                             </button>
                           )}
-                          {!item.isRead && <button type="button" className="mt-1 text-xs font-medium text-blue underline focus-visible:outline focus-visible:outline-2" onClick={() => onMarkRead(item.id)}>Mark read</button>}
+                          {!item.isRead && <button type="button" className="mt-1 text-xs font-medium text-blue underline focus-visible:outline focus-visible:outline-2 disabled:opacity-60" disabled={markingAllRead || markingReadId !== undefined} onClick={() => onMarkRead(item.id)}>{markingReadId === item.id ? "Marking…" : "Mark read"}</button>}
                         </div>
                         <time
                           className="whitespace-nowrap text-xs text-muted"
@@ -2339,6 +2343,8 @@ export default function Home(props: unknown) {
         }
         onMarkRead={(id) => setNotificationRead.mutate({ id, read: true })}
         onOpenNotification={openNotification}
+        markingReadId={setNotificationRead.isPending && setNotificationRead.variables?.id !== undefined ? setNotificationRead.variables.id : undefined}
+        markingAllRead={setNotificationRead.isPending && setNotificationRead.variables?.all === true}
       />
       <div
         className="fixed inset-0 z-40 bg-navy/50 lg:hidden"

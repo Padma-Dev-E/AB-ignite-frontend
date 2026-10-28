@@ -2,10 +2,11 @@
 
 import { useSession } from "next-auth/react";
 import { useMemo, useState, type FormEvent } from "react";
-import { useAdminGovernanceDecision, useAdminScreeningPages, useAdminTransformationPages } from "../hooks";
+import { useAdminEvaluation, useAdminGovernanceDecision, useAdminScreeningPages, useAdminTransformationPages } from "../hooks";
 import type { GovernanceAction } from "../api";
 import type { AdminIdea } from "../types";
-import { AdminDrawer, AdminPagination } from "./admin-data-ui";
+import { AdminActionDialog, AdminDrawer, AdminPagination } from "./admin-data-ui";
+import { AdminIdeaFullDetail } from "./admin-evaluation";
 
 type QueueKind = "screening" | "transformation";
 type QueueIdea = AdminIdea & { assignedUserId?: number | null; dueAt?: string | null; problem?: string | null; solution?: string | null; benefits?: string | null; risks?: string | null };
@@ -27,6 +28,8 @@ export function AdminQueueTable({ kind, statuses, title, detail, empty }: { kind
   const query = kind === "screening" ? screening : transformation;
   const mutation = useAdminGovernanceDecision();
   const [pending, setPending] = useState<PendingDecision | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const fullDetail = useAdminEvaluation(pending?.idea.id ?? null);
   const [success, setSuccess] = useState("");
   const [requestedPage, setPage] = useState(0); const [search, setSearch] = useState(""); const [status, setStatus] = useState(""); const [priority, setPriority] = useState("");
   const loaded = (query.data?.pages.flatMap(page => page.items) ?? []) as QueueIdea[];
@@ -37,7 +40,7 @@ export function AdminQueueTable({ kind, statuses, title, detail, empty }: { kind
   const allActions = pending ? decisions[pending.idea.status] ?? [] : [];
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!pending) return;
-    try { await mutation.mutateAsync({ ideaId: pending.idea.id, action: pending.action }); setSuccess(`${pending.label} decision saved for ${pending.idea.reference}.`); setPending(null); }
+    try { await mutation.mutateAsync({ ideaId: pending.idea.id, action: pending.action }); setSuccess(`${pending.label} decision saved for ${pending.idea.reference}.`); setConfirmOpen(false); setPending(null); }
     catch { /* Mutation error is shown in the drawer. */ }
   }
   return <section aria-label={title} className="min-w-0">
@@ -51,9 +54,12 @@ export function AdminQueueTable({ kind, statuses, title, detail, empty }: { kind
       {query.hasNextPage && <button type="button" className="btn btn-small mt-3" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>{query.isFetchingNextPage ? "Loading…" : "Load more ideas"}</button>}
       {query.error && <p role="alert" className="mt-3 text-sm text-pink">{errorText(query.error)} <button type="button" className="underline" onClick={() => void query.refetch()}>Retry</button></p>}
     </>}
-    <AdminDrawer open={!!pending} onClose={() => { if (!mutation.isPending) setPending(null); }} title={pending?.idea.title ?? "Idea details"} description={pending ? `${pending.idea.reference} · ${human(pending.idea.status)}` : undefined} footer={pending && canReview ? <div className="flex flex-wrap gap-2">{allActions.map(([action, label]) => <button key={action} type="button" className="btn btn-small" disabled={mutation.isPending} onClick={() => { setPending({ ...pending, action, label }); mutation.reset(); }}>{label}</button>)}</div> : undefined}>
-      {pending && <div className="space-y-5">{pending.idea.status === "screening" && <p className="rounded-lg border border-blue/20 bg-blue/5 p-3 text-sm text-muted">Acceptance starts AI-assisted business-owner matching. If the match needs review, the idea will appear in Owner assignment for a manual selection.</p>}{pending.idea.status === "decision" && <p className="rounded-lg border border-teal/30 bg-teal/5 p-3 text-sm text-muted">Business owner approval is complete. Confirm and accept this idea below to move it into proof of concept.</p>}<section><h3 className="text-sm font-semibold">Idea evidence</h3><p className="mt-2 whitespace-pre-wrap text-sm">{pending.idea.summary || "No summary provided."}</p><dl className="mt-4 grid gap-3 sm:grid-cols-2">{[["Problem", pending.idea.problem], ["Solution", pending.idea.solution], ["Benefits", pending.idea.benefits], ["Risks", pending.idea.risks], ["Category", human(pending.idea.category)], ["AI validation score", pending.idea.aiValidationScore == null ? "Not recorded" : `${pending.idea.aiValidationScore.toFixed(1)} / 10`], ["AI validation attempts", pending.idea.aiValidationAttempts ?? "Not recorded"], ["Submission route", pending.idea.submittedWithLowAiScore ? "Submitted for human review after repeated low scores" : "Standard AI validation"], ["Priority score", pending.idea.priorityScore == null ? "Not recorded" : `${pending.idea.priorityScore.toFixed(2)} / 3`], ["Author", `${pending.idea.authorName} · ${pending.idea.department}`], ["Created", new Date(pending.idea.createdAt).toLocaleDateString()]].map(([label, value]) => <div key={String(label)} className="rounded-lg border border-[var(--line)] p-3"><dt className="text-xs text-muted">{label}</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{value === null || value === undefined || value === "" ? "Not provided" : String(value)}</dd></div>)}</dl></section>
-      {canReview && <form className="border-t border-[var(--line)] pt-4" onSubmit={submit}><h3 className="font-medium">{pending.label}</h3><p className="mt-3 text-xs text-muted">This action and its status change are recorded automatically.</p>{mutation.isError && <p role="alert" className="mt-3 text-sm text-pink">{errorText(mutation.error)}</p>}<button type="submit" className="btn-primary mt-4" disabled={mutation.isPending}>{mutation.isPending ? "Saving…" : pending.action === "accept" ? "Accept and start matching" : "Confirm decision"}</button></form>}</div>}
+    <AdminDrawer open={!!pending} onClose={() => { if (!mutation.isPending && !confirmOpen) setPending(null); }} title={pending?.idea.title ?? "Idea details"} description={pending ? `${pending.idea.reference} · ${human(pending.idea.status)}` : undefined} width="idea" headerActions={pending && canReview ? allActions.map(([action, label]) => <button key={action} type="button" className={action === "accept" ? "btn-primary btn-small" : "btn btn-small"} disabled={mutation.isPending} onClick={() => { setPending({ ...pending, action, label }); mutation.reset(); setConfirmOpen(true); }}>{label}</button>) : undefined}>
+      {pending && <div className="space-y-4">{pending.idea.status === "screening" && <p className="rounded-xl border border-blue/20 bg-blue/5 p-4 text-sm text-muted">Accepting starts AI-assisted business-owner matching. If the match needs review, this idea appears in Owner assignment for a manual selection.</p>}{pending.idea.status === "decision" && <p className="rounded-xl border border-teal/30 bg-teal/5 p-4 text-sm text-muted">Business owner approval is complete. Confirm acceptance to move this idea into proof of concept.</p>}{fullDetail.isPending ? <div role="status" aria-busy="true" className="rounded-xl border border-[var(--line)] p-4 text-sm text-muted">Loading full idea details…</div> : fullDetail.isError ? <div role="alert" className="rounded-xl border border-pink/40 p-4 text-sm"><p>Full idea details could not be loaded: {errorText(fullDetail.error)}</p><button type="button" className="btn btn-small mt-3" onClick={() => void fullDetail.refetch()}>Try again</button></div> : fullDetail.data ? <AdminIdeaFullDetail detail={fullDetail.data} /> : <p className="text-sm text-muted">Full idea details are unavailable.</p>}</div>}
     </AdminDrawer>
+    <AdminActionDialog open={confirmOpen && Boolean(pending) && canReview} onClose={() => { if (!mutation.isPending) setConfirmOpen(false); }} title={pending?.label ?? "Confirm idea action"} description={pending ? `Confirm this action for ${pending.idea.reference}. The resulting status change will be recorded automatically.` : undefined}>
+      {mutation.isError && <p role="alert" className="text-sm text-pink">{errorText(mutation.error)}</p>}
+      <form id="governance-decision-form" onSubmit={event => void submit(event)} className="flex justify-end gap-2"><button type="button" className="btn" disabled={mutation.isPending} onClick={() => setConfirmOpen(false)}>Cancel</button><button type="submit" className="btn-primary" disabled={mutation.isPending}>{mutation.isPending ? "Saving…" : pending?.action === "accept" ? "Accept and start matching" : "Confirm decision"}</button></form>
+    </AdminActionDialog>
   </section>;
 }

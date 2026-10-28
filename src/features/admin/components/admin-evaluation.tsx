@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, type FormEvent } from "react";
+import React, { useState, type FormEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "../../../components/ui";
 import { useAdminEvaluation, useAdminEvaluationDecision } from "../hooks";
 import type { AdminEvaluationDetail } from "../types";
 import { adminQueryKeys, getAdminAiDiagnostics, type EvaluationAction } from "../api";
-import { AdminDrawer } from "./admin-data-ui";
+import { AdminActionDialog, AdminDrawer } from "./admin-data-ui";
 import { listAdminEvaluationPage } from "../standalone-list-api";
 
 const legacyAnswerLabels: Record<string, string> = {
@@ -34,14 +34,81 @@ function display(value: unknown): string {
   if (value === null || value === undefined || value === "") return "Not provided";
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return JSON.stringify(value, null, 2);
+  return "Details are shown below.";
+}
+
+const assessmentLabels: Record<string, string> = {
+  decision: "Recommendation", confidence: "Confidence", overallScore: "Overall score",
+  scores: "Evidence scores", evaluation: "Operational evaluation", strengths: "Strengths",
+  gaps: "Areas to strengthen", assumptions: "Assumptions", questions: "Questions for review",
+  risks: "Risks", nextActions: "Suggested next steps", auditSummary: "Assessment summary",
+  suggestedTitle: "Suggested title", conciseSummary: "Summary", problemStatement: "Problem",
+  solutionStatement: "Proposed solution", riskStatement: "Risk considerations", valueStatement: "Expected value",
+  tags: "Tags", taxonomy: "Topics", affectedTeams: "Affected teams", completeness: "Completeness",
+  question: "Question", reason: "Why this matters", required: "Required", answerType: "Answer format",
+  severity: "Severity", description: "Description", action: "Next step", ownerRole: "Owner",
+  score: "Score", rationale: "Rationale", turnaroundTime: "Turnaround time", volume: "Volume",
+  savingsRevenue: "Savings or revenue", novelty: "Novelty", problemClarity: "Problem clarity",
+  customerImpact: "Customer impact", employeeImpact: "Employee impact", strategicAlignment: "Strategic alignment",
+  feasibility: "Feasibility", value: "Value", risk: "Risk", urgency: "Urgency", scalability: "Scalability",
+  beneficiaries: "Who benefits?", currentProcess: "Current process", needed: "What is needed?", successMeasure: "Success measure",
+};
+
+function readableLabel(key: string) {
+  return assessmentLabels[key] ?? key.replaceAll(/([A-Z])/g, " $1").replaceAll(/[_.-]/g, " ").replace(/^\w/, letter => letter.toUpperCase());
+}
+
+function parseStructuredJson(value: string): unknown | null {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function AssessmentValue({ value }: { value: unknown }): ReactNode {
+  if (value === null || value === undefined || value === "") return <span className="text-muted">Not provided</span>;
+  if (typeof value === "string") {
+    const parsed = parseStructuredJson(value);
+    if (parsed) return <AssessmentValue value={parsed} />;
+  }
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "string" || typeof value === "number") return <span className="whitespace-pre-wrap break-words">{String(value)}</span>;
+  if (Array.isArray(value)) {
+    if (!value.length) return <span className="text-muted">None listed</span>;
+    if (value.every(item => typeof item === "string" || typeof item === "number")) {
+      return <ul className="list-disc space-y-1 pl-5">{value.map((item, index) => <li key={`${index}-${String(item)}`}>{String(item)}</li>)}</ul>;
+    }
+    return <div className="space-y-2">{value.map((item, index) => <div key={index} className="rounded-lg bg-[var(--hover)] p-3"><AssessmentValue value={item} /></div>)}</div>;
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (!entries.length) return <span className="text-muted">No details provided</span>;
+    const score = (value as Record<string, unknown>).score;
+    const rationale = (value as Record<string, unknown>).rationale;
+    if (typeof score === "number" && typeof rationale === "string") return <div className="space-y-1"><p className="font-medium">{score.toFixed(1)} / 10</p><p className="text-sm text-muted">{rationale}</p></div>;
+    return <dl className="grid gap-2 sm:grid-cols-2">{entries.map(([key, child]) => <div key={key} className="min-w-0"><dt className="text-xs text-muted">{readableLabel(key)}</dt><dd className="mt-0.5 text-sm"><AssessmentValue value={child} /></dd></div>)}</dl>;
+  }
+  return <span className="text-muted">Not provided</span>;
 }
 
 function Assessment({ result }: { result: unknown }) {
   if (result === null || result === undefined) return <p className="text-sm text-muted">No completed AI assessment is available.</p>;
-  if (typeof result !== "object" || Array.isArray(result)) return <pre className="whitespace-pre-wrap break-words text-sm">{display(result)}</pre>;
+  if (typeof result === "string") {
+    const parsed = parseStructuredJson(result);
+    if (parsed) return <Assessment result={parsed} />;
+  }
+  if (typeof result !== "object" || Array.isArray(result)) return <div className="text-sm"><AssessmentValue value={result} /></div>;
   const entries = Object.entries(result as Record<string, unknown>);
-  return <dl className="grid gap-3 sm:grid-cols-2">{entries.map(([key, value]) => <div key={key} className="rounded-xl border p-3" style={{ borderColor: "var(--line)" }}><dt className="text-xs text-muted">{key.replaceAll(/([A-Z])/g, " $1").replaceAll("_", " ")}</dt><dd className="mt-1 whitespace-pre-wrap break-words text-sm">{display(value)}</dd></div>)}</dl>;
+  const priority = ["decision", "overallScore", "confidence", "auditSummary", "suggestedTitle", "conciseSummary", "problemStatement", "solutionStatement", "valueStatement", "strengths", "gaps", "assumptions", "scores", "evaluation", "questions", "risks", "nextActions"];
+  entries.sort(([left], [right]) => {
+    const li = priority.indexOf(left); const ri = priority.indexOf(right);
+    return (li < 0 ? priority.length : li) - (ri < 0 ? priority.length : ri);
+  });
+  return <div className="space-y-4">{entries.map(([key, value]) => <section key={key} className="rounded-xl border p-4" style={{ borderColor: "var(--line)" }}><h4 className="text-sm font-semibold text-[var(--text)]">{readableLabel(key)}</h4><div className="mt-2 text-sm leading-6"><AssessmentValue value={value} /></div></section>)}</div>;
 }
 
 export function AdminAiDiagnosticsPanel({ ideaId, runId }: { ideaId: number; runId?: number }) {
@@ -56,7 +123,7 @@ export function AdminIdeaFullDetail({ detail }: { detail: AdminEvaluationDetail 
   const { idea, submission } = detail;
   const metrics = submission?.metrics;
   return <div className="space-y-4">
-    <Card><div className="flex flex-wrap items-center gap-2"><span className="pill">{idea.reference}</span><span className="pill">{statusLabel(idea.status)}</span><span className="ml-auto text-xs text-muted">{idea.category}</span></div><h2 className="mt-3 text-2xl font-medium">{idea.title}</h2><p className="mt-2 text-sm text-muted">{idea.authorName} · {idea.department} · Submitted {new Date(submission?.submittedAt ?? idea.createdAt).toLocaleDateString()}</p><p className="mt-4 whitespace-pre-wrap">{idea.summary}</p><div className="mt-4 grid gap-3 sm:grid-cols-2">{[["Problem", idea.problem], ["Solution", idea.solution], ["Benefits", idea.benefits], ["Risks", idea.risks]].map(([label, value]) => <div key={label} className="rounded-xl border p-3" style={{ borderColor: "var(--line)" }}><h3 className="text-xs text-muted">{label}</h3><p className="mt-1 whitespace-pre-wrap text-sm">{value || "Not provided"}</p></div>)}</div></Card>
+    <Card><div className="flex flex-wrap items-center gap-2"><span className="pill">{idea.reference}</span><span className="pill">{statusLabel(idea.status)}</span><span className="ml-auto text-xs text-muted">{idea.category}</span></div><p className="mt-2 text-sm text-muted">{idea.authorName} · {idea.department} · Submitted {new Date(submission?.submittedAt ?? idea.createdAt).toLocaleDateString()}</p><p className="mt-4 whitespace-pre-wrap">{idea.summary}</p><div className="mt-4 grid gap-3 sm:grid-cols-2">{[["Problem", idea.problem], ["Solution", idea.solution], ["Benefits", idea.benefits], ["Risks", idea.risks]].map(([label, value]) => <div key={label} className="rounded-xl border p-3" style={{ borderColor: "var(--line)" }}><h3 className="text-xs text-muted">{label}</h3><p className="mt-1 whitespace-pre-wrap text-sm">{value || "Not provided"}</p></div>)}</div></Card>
     {detail.ownerMatch && <Card><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-lg font-medium">{detail.ownerMatch.eventType === "owner_match_manual_required" ? "Manual owner assignment needed" : detail.ownerMatch.source === "ai" ? "AI owner match" : "Business owner assignment"}</h3><p className="mt-1 text-xs text-muted">Updated {new Date(detail.ownerMatch.createdAt).toLocaleString()}</p></div>{typeof detail.ownerMatch.confidence === "number" && <span className="pill">{Math.round(detail.ownerMatch.confidence * 100)}% confidence</span>}</div>{detail.ownerMatch.rationale && <p className="mt-3 whitespace-pre-wrap text-sm">{detail.ownerMatch.rationale}</p>}{detail.ownerMatch.reasonCode && <p className="mt-3 text-sm text-muted">Matching could not complete ({detail.ownerMatch.reasonCode.replaceAll("_", " ")}). Assign an active business owner manually.</p>}</Card>}
     <Card><h3 className="text-lg font-medium">Idea-specific answers</h3>{submission?.answers && Object.keys(submission.answers).length ? <dl className="mt-3 grid gap-3 sm:grid-cols-2">{Object.entries(submission.answers).map(([question, answer]) => <div key={question} className="rounded-xl border p-3" style={{ borderColor: "var(--line)" }}><dt className="text-xs text-muted">{legacyAnswerLabels[question] ?? question}</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{display(answer)}</dd></div>)}</dl> : <p className="mt-3 text-sm text-muted">No question answers were recorded.</p>}{submission?.differentiation && <p className="mt-3 text-sm"><span className="text-muted">Differentiation: </span>{submission.differentiation}</p>}</Card>
     <Card><h3 className="text-lg font-medium">AI validation record</h3><div className="mt-3 grid gap-3 sm:grid-cols-3"><div className="rounded-xl border p-3" style={{ borderColor: "var(--line)" }}><p className="text-xs text-muted">AI score</p><p className="mt-1 text-xl font-medium">{submission?.aiValidationScore == null ? "Not recorded" : `${submission.aiValidationScore.toFixed(1)} / 10`}</p></div><div className="rounded-xl border p-3" style={{ borderColor: "var(--line)" }}><p className="text-xs text-muted">Distinct draft validations</p><p className="mt-1 text-xl font-medium">{submission?.aiValidationAttempts ?? "Not recorded"}</p></div><div className="rounded-xl border p-3" style={{ borderColor: "var(--line)" }}><p className="text-xs text-muted">Review route</p><p className="mt-1 text-sm font-medium">{submission?.submittedWithLowAiScore ? "Human review after repeated low scores" : submission?.validationPassed ? "Standard AI validation passed" : "Validation status not recorded"}</p></div></div><p className="mt-3 text-xs text-muted">AI validation is advisory to the reviewer. The priority score and component breakdown are shown separately below.</p></Card>
@@ -73,6 +140,7 @@ export function AdminEvaluation({ mode = "business_owner" }: { mode?: "business_
   const detail = useAdminEvaluation(selectedId);
   const decision = useAdminEvaluationDecision();
   const [pending, setPending] = useState<EvaluationAction | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [controlName, setControlName] = useState(""); const [success, setSuccess] = useState("");
   const [search, setSearch] = useState(""); const [status, setStatus] = useState(""); const [priority, setPriority] = useState("");
   const items = queue.data?.items ?? [];
@@ -82,7 +150,7 @@ export function AdminEvaluation({ mode = "business_owner" }: { mode?: "business_
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedId || !pending || (mode === "control" && pending === "approve" && !controlName)) return;
-    try { await decision.mutateAsync({ ideaId: selectedId, action: pending, ...(mode === "control" && pending === "approve" ? { controlName } : {}) }); setSuccess(`${mode === "control" && pending === "approve" ? `${controlName} approval` : actionLabels[pending]} recorded for ${detail.data?.idea.reference ?? `idea #${selectedId}`}.`); setPending(null); setControlName(""); await queue.refetch(); }
+    try { await decision.mutateAsync({ ideaId: selectedId, action: pending, ...(mode === "control" && pending === "approve" ? { controlName } : {}) }); setSuccess(`${mode === "control" && pending === "approve" ? `${controlName} approval` : actionLabels[pending]} recorded for ${detail.data?.idea.reference ?? `idea #${selectedId}`}.`); setPending(null); setConfirmOpen(false); setControlName(""); await queue.refetch(); }
     catch { /* Mutation error is rendered in the drawer. */ }
   }
   function changePage(next: number) {
@@ -98,9 +166,12 @@ export function AdminEvaluation({ mode = "business_owner" }: { mode?: "business_
       {filtered.length ? <div className="overflow-x-auto rounded-xl border border-[var(--line)] bg-white"><table className="w-full min-w-[760px] border-collapse text-left text-sm"><thead className="bg-[#f8faff] text-xs text-muted"><tr>{["Reference", "Idea", "Author", "AI validation / priority", "Status", "Details"].map(label => <th key={label} scope="col" className="border-b border-[var(--line)] px-3 py-3 font-medium">{label}</th>)}</tr></thead><tbody>{filtered.map(idea => <tr key={idea.id} className="border-b border-[var(--line)] last:border-0"><td className="whitespace-nowrap px-3 py-4 font-medium">{idea.reference}</td><td className="min-w-[240px] px-3 py-4"><button type="button" className="text-left font-medium hover:underline" onClick={() => { setSelectedId(idea.id); setPending(null); setSuccess(""); setControlName(""); decision.reset(); }}>{idea.title}</button><span className="mt-1 block text-xs text-muted">{idea.category}</span></td><td className="px-3 py-4">{idea.authorName}<span className="block text-xs text-muted">{idea.department}</span></td><td className="px-3 py-4"><span className="block">AI {idea.aiValidationScore == null ? "—" : `${idea.aiValidationScore.toFixed(1)} / 10`}</span><span className="mt-1 block text-xs text-muted">Priority {idea.priorityScore == null ? "—" : `${idea.priorityScore.toFixed(2)} / 3`} · {idea.priorityBand ?? "Unbanded"}</span>{idea.submittedWithLowAiScore && <span className="mt-1 inline-flex pill text-sand border-sand/40">Human review</span>}</td><td className="px-3 py-4 whitespace-nowrap">{statusLabel(idea.status)}</td><td className="px-3 py-4"><button type="button" className="btn btn-small" onClick={() => { setSelectedId(idea.id); setPending(null); setSuccess(""); setControlName(""); decision.reset(); }}>Open</button></td></tr>)}</tbody></table></div> : <p className="rounded-xl border border-[var(--line)] p-5 text-sm text-muted">{search || status || priority ? "No assigned ideas match these filters." : "No ideas are currently assigned to your account."}</p>}
       <nav aria-label="Assigned ideas pagination" className="mt-4 flex items-center justify-between border-t border-[var(--line)] pt-4"><p className="text-sm text-muted" aria-live="polite">Page {pageIndex + 1} · {items.length} ideas{queue.data?.nextAfter ? " · more ideas available" : " · end of list"}</p><div className="flex gap-2"><button type="button" className="btn btn-small" disabled={pageIndex === 0 || queue.isFetching} onClick={() => changePage(pageIndex)}>Previous</button><button type="button" className="btn btn-small" disabled={!queue.data?.nextAfter || queue.isFetching} onClick={() => changePage(pageIndex + 2)}>{queue.isFetching ? "Loading…" : "Next"}</button></div></nav>
     </>}
-    <AdminDrawer open={selectedId !== null} onClose={() => { if (!decision.isPending && !pending) setSelectedId(null); }} title={detail.data?.idea.title ?? "Evaluation details"} description={detail.data ? `${detail.data.idea.reference} · ${statusLabel(detail.data.idea.status)}` : undefined}>
-      {detail.isPending ? <div className="p-5 text-sm text-muted" role="status" aria-busy="true">Loading evaluation detail…</div> : detail.isError ? <div className="rounded-xl border border-pink/40 p-4" role="alert"><p className="text-sm">Evaluation detail unavailable: {message(detail.error)}</p><button className="btn btn-small mt-3" type="button" onClick={() => void detail.refetch()}>Try again</button></div> : detail.data ? <><AdminIdeaFullDetail detail={detail.data} /><section className="mt-4 rounded-xl border border-[var(--line)] p-4"><h3 className="font-medium">Your next step</h3><p className="mt-1 text-sm text-muted">Actions are available only for the current lifecycle stage. The assigned business owner controls this idea through delivery.</p>{availableActions.length ? <div className="mt-3 flex flex-wrap gap-2">{availableActions.map(action => <button key={action} type="button" className={action === "approve" || action === "confirm" ? "btn-primary" : "btn"} disabled={decision.isPending || (action === "approve" && detail.data?.idea.status === "control_review" && detail.data?.controlReview?.pending.length === 0)} onClick={() => { decision.reset(); setPending(action); setControlName(""); }}>{mode === "control" && action === "approve" ? "Approve selected control" : actionLabels[action]}</button>)}</div> : <p className="mt-3 rounded-lg bg-[var(--hover)] p-3 text-sm text-muted">This idea is complete or awaiting another workflow stage. No action is available to you now.</p>}
-      {pending && <form className="mt-4 space-y-3 border-t border-[var(--line)] pt-4" onSubmit={event => void submit(event)}>{mode === "control" && pending === "approve" && <label className="block text-sm">Control to approve<select required className="input mt-1" value={controlName} onChange={e => setControlName(e.target.value)}><option value="">Select a pending control</option>{(detail.data.controlReview?.pending ?? []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>}{decision.isError && <p className="text-sm text-pink" role="alert">Decision failed: {message(decision.error)}</p>}<div className="flex justify-end gap-2"><button type="button" className="btn" disabled={decision.isPending} onClick={() => setPending(null)}>Cancel</button><button type="submit" className="btn-primary" disabled={decision.isPending || (mode === "control" && pending === "approve" && !controlName)}>{decision.isPending ? "Saving…" : "Confirm decision"}</button></div></form>}</section></> : null}
+    <AdminDrawer open={selectedId !== null} onClose={() => { if (!decision.isPending && !confirmOpen) setSelectedId(null); }} title={detail.data?.idea.title ?? "Evaluation details"} description={detail.data ? `${detail.data.idea.reference} · ${statusLabel(detail.data.idea.status)}` : undefined} width="idea" headerActions={availableActions.map(action => <button key={action} type="button" className={action === "approve" || action === "confirm" ? "btn-primary btn-small" : "btn btn-small"} disabled={decision.isPending || (action === "approve" && detail.data?.idea.status === "control_review" && detail.data?.controlReview?.pending.length === 0)} onClick={() => { decision.reset(); setPending(action); setControlName(""); setConfirmOpen(true); }}>{mode === "control" && action === "approve" ? "Approve selected control" : actionLabels[action]}</button>)}>
+      {detail.isPending ? <div className="p-5 text-sm text-muted" role="status" aria-busy="true">Loading evaluation detail…</div> : detail.isError ? <div className="rounded-xl border border-pink/40 p-4" role="alert"><p className="text-sm">Evaluation detail unavailable: {message(detail.error)}</p><button className="btn btn-small mt-3" type="button" onClick={() => void detail.refetch()}>Try again</button></div> : detail.data ? <AdminIdeaFullDetail detail={detail.data} /> : null}
     </AdminDrawer>
+    <AdminActionDialog open={confirmOpen && pending !== null} onClose={() => { if (!decision.isPending) { setConfirmOpen(false); setPending(null); } }} title={pending ? actionLabels[pending] ?? "Confirm decision" : "Confirm decision"} description={detail.data ? `Confirm this action for ${detail.data.idea.reference}. The status change will be recorded in the idea history.` : "Confirm this idea decision."}>
+      {pending && <form id="evaluation-decision-form" onSubmit={event => void submit(event)} className="space-y-3">{mode === "control" && pending === "approve" && <label className="block text-sm">Control to approve<select required className="input mt-1" value={controlName} onChange={e => setControlName(e.target.value)}><option value="">Select a pending control</option>{(detail.data?.controlReview?.pending ?? []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>}{decision.isError && <p className="text-sm text-pink" role="alert">Decision failed: {message(decision.error)}</p>}</form>}
+      {pending && <div className="mt-4 flex justify-end gap-2"><button type="button" className="btn" disabled={decision.isPending} onClick={() => { setConfirmOpen(false); setPending(null); }}>Cancel</button><button type="submit" form="evaluation-decision-form" className="btn-primary" disabled={decision.isPending || (mode === "control" && pending === "approve" && !controlName)}>{decision.isPending ? "Saving…" : "Confirm decision"}</button></div>}
+    </AdminActionDialog>
   </div>;
 }

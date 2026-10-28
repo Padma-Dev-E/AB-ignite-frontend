@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAdminBusinessOwnerPages, useAdminEvaluation, useAdminProgressPages, useAssignAdminBusinessOwner } from "../hooks";
 import type { AdminIdea, BusinessOwnerOption } from "../types";
-import { AdminDrawer } from "./admin-data-ui";
+import { AdminActionDialog, AdminDrawer } from "./admin-data-ui";
 import { AdminIdeaFullDetail } from "./admin-evaluation";
 
 const statusNames: Record<string, string> = {
@@ -61,6 +61,7 @@ export function AdminProgress() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<AdminIdea | null>(null);
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [ownerId, setOwnerId] = useState("");
   const [success, setSuccess] = useState("");
   const detail = useAdminEvaluation(selected?.id ?? null);
@@ -88,6 +89,7 @@ export function AdminProgress() {
       setSuccess(`${selected.reference} ${selected.assignedUserId ? "reassigned" : "assigned"} successfully.`);
       setSelected(current => current ? { ...current, assignedUserId: Number(ownerId), assignedOwnerName: ownerRows.find(owner => owner.id === Number(ownerId))?.name ?? null, status: current.assignedUserId ? current.status : "business_review" } : null);
       setOwnerId("");
+      setAssignmentDialogOpen(false);
       await detail.refetch();
     } catch { /* Keep the drawer open and show the API error for retry. */ }
   }
@@ -101,12 +103,14 @@ export function AdminProgress() {
       {query.isFetchNextPageError && <p className="mt-2 text-sm text-pink" role="alert">The next page failed: {errorText(query.error)}. <button className="underline" type="button" onClick={() => void moveTo(page + 1)}>Retry</button></p>}
     </>}
 
-    <AdminDrawer open={selected !== null} onClose={() => { if (!assign.isPending) setSelected(null); }} title={detail.data?.idea.title ?? selected?.title ?? "Idea progress"} description={detail.data ? `${detail.data.idea.reference} · ${readable(detail.data.idea.status)}` : selected ? `${selected.reference} · ${readable(selected.status)}` : undefined} footer={selected && eligibleForAssign ? <div className="flex flex-wrap justify-end gap-2"><button type="button" className="btn" disabled={assign.isPending} onClick={() => setSelected(null)}>Close</button><button type="button" className="btn-primary" disabled={assign.isPending || owners.isPending || owners.isError || !ownerId || Number(ownerId) === selected.assignedUserId} onClick={() => void submitAssignment()}>{assign.isPending ? "Saving assignment…" : selected.assignedUserId ? "Reassign owner" : "Assign owner"}</button></div> : undefined}>
+    <AdminDrawer open={selected !== null} onClose={() => { if (!assign.isPending && !assignmentDialogOpen) setSelected(null); }} title={detail.data?.idea.title ?? selected?.title ?? "Idea progress"} description={detail.data ? `${detail.data.idea.reference} · ${readable(detail.data.idea.status)}` : selected ? `${selected.reference} · ${readable(selected.status)}` : undefined} width="idea" headerActions={selected && eligibleForAssign ? <button type="button" className="btn-primary btn-small" disabled={assign.isPending} onClick={() => { assign.reset(); setOwnerId(""); setAssignmentDialogOpen(true); }}>{selected.assignedUserId ? "Reassign owner" : "Assign owner"}</button> : undefined}>
       {!selected ? null : <div className="space-y-4">
         <section className="rounded-xl border border-[var(--line)] p-4"><h3 className="font-medium">Current ownership</h3><p className="mt-2 text-sm">{selected.assignedOwnerName ? `${selected.assignedOwnerName} · ${selected.department}` : selected.assignedUserId ? "An owner is assigned, but their profile is unavailable." : "No business owner assigned"}</p><p className="mt-1 text-xs text-muted">Current stage: {readable(selected.status)}{selected.status === "owner_matching" ? ". AI matching is in progress; you may assign an owner manually if needed." : selected.status === "owner_assignment" ? ". AI could not confirm a match. Choose an active business owner to continue." : ""}</p></section>
-        {eligibleForAssign && <section className="space-y-3 rounded-xl border border-blue/20 bg-blue/5 p-4"><h3 className="font-medium">{selected.assignedUserId ? "Change business owner" : "Manual owner assignment"}</h3><p className="text-sm text-muted">The new owner takes over the assigned idea lifecycle. This change is recorded in the idea history and audit trail.</p><OwnerOptions owners={owners} value={ownerId} onChange={setOwnerId} />{assign.isError && <p role="alert" className="text-sm text-pink">Assignment failed: {errorText(assign.error)} <button className="underline" type="button" onClick={() => { void query.refetch(); void detail.refetch(); void owners.refetch(); }}>Refresh idea and owner data</button></p>}</section>}
         {detail.isPending ? <div role="status" aria-busy="true" className="rounded-lg border border-[var(--line)] p-4 text-sm text-muted">Loading full idea details…</div> : detail.isError ? <div role="alert" className="rounded-lg border border-pink/40 p-4 text-sm"><p>Idea details could not be loaded: {errorText(detail.error)}</p><button type="button" className="btn btn-small mt-3" onClick={() => void detail.refetch()}>Retry</button></div> : detail.data ? <AdminIdeaFullDetail detail={detail.data} /> : null}
       </div>}
     </AdminDrawer>
+    <AdminActionDialog open={assignmentDialogOpen && Boolean(selected) && eligibleForAssign} onClose={() => { if (!assign.isPending) setAssignmentDialogOpen(false); }} title={selected?.assignedUserId ? "Reassign business owner" : "Assign business owner"} description={selected ? `Choose the owner who will take over ${selected.reference}. This change is recorded in the idea history and audit trail.` : undefined}>
+      <div className="space-y-3"><OwnerOptions owners={owners} value={ownerId} onChange={setOwnerId} />{assign.isError && <p role="alert" className="text-sm text-pink">Assignment failed: {errorText(assign.error)} <button className="underline" type="button" onClick={() => { void query.refetch(); void detail.refetch(); void owners.refetch(); }}>Refresh idea and owner data</button></p>}<div className="flex justify-end gap-2"><button type="button" className="btn" disabled={assign.isPending} onClick={() => setAssignmentDialogOpen(false)}>Cancel</button><button type="button" className="btn-primary" disabled={assign.isPending || owners.isPending || owners.isError || !ownerId || Number(ownerId) === selected?.assignedUserId} onClick={() => void submitAssignment()}>{assign.isPending ? "Saving assignment…" : selected?.assignedUserId ? "Confirm reassignment" : "Confirm assignment"}</button></div></div>
+    </AdminActionDialog>
   </section>;
 }

@@ -239,7 +239,7 @@ export function EmployeeNotificationsPanel({ onOpenNotification }: { onOpenNotif
             disabled={setRead.isPending}
             onClick={() => setRead.mutate({ all: true, read: true })}
           >
-            Mark all read
+            {setRead.isPending && setRead.variables?.all ? "Marking…" : "Mark all read"}
           </Button>
         )}
       </div>
@@ -296,7 +296,7 @@ export function EmployeeNotificationsPanel({ onOpenNotification }: { onOpenNotif
                       setRead.mutate({ id: notification.id, read: true })
                     }
                   >
-                    Mark read
+                    {setRead.isPending && setRead.variables?.id === notification.id ? "Marking…" : "Mark read"}
                   </Button>
                 )}
               </li>

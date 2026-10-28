@@ -10,6 +10,7 @@ export function AdminDrawer({
   description,
   children,
   footer,
+  headerActions,
   width = "wide",
 }: {
   open: boolean;
@@ -18,20 +19,59 @@ export function AdminDrawer({
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
-  width?: "wide" | "narrow";
+  headerActions?: ReactNode;
+  width?: "wide" | "narrow" | "idea";
 }) {
+  const panelWidth = width === "narrow"
+    ? "sm:max-w-lg"
+    : width === "idea"
+      ? "sm:w-[60vw] sm:max-w-[1100px]"
+      : "sm:max-w-2xl";
   return <Dialog open={open} onClose={onClose} className="relative z-50">
     <div className="fixed inset-0 bg-[#10233d]/35 backdrop-blur-[1px]" aria-hidden="true" />
-    <DialogPanel className={`fixed inset-y-0 right-0 flex h-full w-full flex-col border-l border-[var(--line)] bg-white shadow-2xl ${width === "narrow" ? "sm:max-w-lg" : "sm:max-w-2xl"}`}>
-      <header className="shrink-0 border-b border-[var(--line)] bg-white px-5 py-5 sm:px-7">
+    <DialogPanel className={`fixed inset-y-0 right-0 flex h-full w-full flex-col border-l border-[var(--line)] bg-white shadow-2xl ${panelWidth}`}>
+      <header className="z-10 shrink-0 border-b border-[var(--line)] bg-white px-5 py-4 sm:px-7">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0"><DialogTitle className="text-xl font-semibold tracking-tight text-[var(--text)]">{title}</DialogTitle>{description && <p className="mt-1 text-sm leading-5 text-muted">{description}</p>}</div>
           <button type="button" aria-label="Close details" onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--line)] text-lg text-muted hover:bg-[#f4f7fb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1762a7]">×</button>
         </div>
+        {headerActions && <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--line)] pt-3">{headerActions}</div>}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7">{children}</div>
       {footer && <footer className="shrink-0 border-t border-[var(--line)] bg-white px-5 py-4 sm:px-7">{footer}</footer>}
     </DialogPanel>
+  </Dialog>;
+}
+
+export function AdminActionDialog({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  children?: ReactNode;
+  footer?: ReactNode;
+}) {
+  return <Dialog open={open} onClose={onClose} className="relative z-[60]">
+    <div className="fixed inset-0 bg-[#10233d]/40 backdrop-blur-[1px]" aria-hidden="true" />
+    <div className="fixed inset-0 z-[60] overflow-y-auto p-4 sm:p-6">
+      <div className="flex min-h-full items-center justify-center">
+        <DialogPanel className="w-full max-w-lg rounded-2xl border border-[var(--line)] bg-white shadow-2xl">
+          <div className="border-b border-[var(--line)] px-5 py-4 sm:px-6">
+            <DialogTitle className="text-lg font-semibold text-[var(--text)]">{title}</DialogTitle>
+            {description && <p className="mt-1 text-sm leading-5 text-muted">{description}</p>}
+          </div>
+          {children && <div className="px-5 py-4 sm:px-6">{children}</div>}
+          {footer && <div className="border-t border-[var(--line)] px-5 py-4 sm:px-6">{footer}</div>}
+        </DialogPanel>
+      </div>
+    </div>
   </Dialog>;
 }
 

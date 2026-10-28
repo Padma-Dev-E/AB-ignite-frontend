@@ -176,6 +176,34 @@ function StateMessage({
   );
 }
 
+function WizardProgressPanel({
+  title,
+  detail,
+}: {
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div
+      className="my-4 flex min-h-[88px] items-center gap-3 rounded-xl border bg-blue/[.045] px-4 py-3.5"
+      style={{ borderColor: "var(--line)" }}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      aria-busy="true"
+    >
+      <span
+        aria-hidden="true"
+        className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-blue/20 border-t-blue motion-reduce:animate-none"
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-ink">{title}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-muted">{detail}</span>
+      </span>
+    </div>
+  );
+}
+
 function errorMessage(error: unknown) {
   return error instanceof ApiError
     ? error.message
@@ -635,6 +663,9 @@ export function EmployeeIdeaSubmissionPage({
   const [pendingQuestions, setPendingQuestions] = useState(false);
   const [questionVersionId, setQuestionVersionId] = useState<number | null>(null);
   const [aiAction, setAiAction] = useState<"enrich" | "questions" | "validate" | null>(null);
+  const aiRequestLock = useRef(false);
+  const submitRequestLock = useRef(false);
+  const finalizeRequestLock = useRef(false);
   const [activeDevelopmentRun, setActiveDevelopmentRun] = useState<{
     runId: number;
     versionId: number;
@@ -697,6 +728,14 @@ export function EmployeeIdeaSubmissionPage({
   const validationInProgress = Boolean(
     (activeRunInProgress && activeDevelopmentRun?.action === "validate") ||
     validationRun?.pending,
+  );
+  const enrichmentInProgress = Boolean(
+    (activeRunInProgress && activeDevelopmentRun?.action === "enrich") || enrichmentRun?.pending,
+  );
+  const questionsInProgress = Boolean(
+    pendingQuestions ||
+    (activeRunInProgress && activeDevelopmentRun?.action === "questions") ||
+    questionsRun?.pending,
   );
   const enrichment =
     enrichmentRun?.completed
@@ -962,7 +1001,8 @@ export function EmployeeIdeaSubmissionPage({
     return result;
   };
   const requestDevelopment = async (action: "enrich" | "questions" | "validate") => {
-    if (title.trim().length < 3 || summary.trim().length < 10) return null;
+    if (aiRequestLock.current || title.trim().length < 3 || summary.trim().length < 10) return null;
+    aiRequestLock.current = true;
     setDevelopmentError(null);
     setAiAction(action);
     try {
@@ -994,11 +1034,13 @@ export function EmployeeIdeaSubmissionPage({
       else setDevelopmentError(errorMessage(error));
       return null;
     } finally {
+      aiRequestLock.current = false;
       setAiAction(null);
     }
   };
 
   const prepareReviewerQuestions = async () => {
+    if (pendingQuestions || aiRequestLock.current) return;
     setPendingQuestions(true);
     setQuestionError(null);
     setContinueWithoutQuestions(false);
@@ -1019,7 +1061,7 @@ export function EmployeeIdeaSubmissionPage({
 
   const startIdeaDevelopment = async () => {
     const description = raw.trim();
-    if (description.length < 10) return;
+    if (description.length < 10 || aiRequestLock.current) return;
     // Resuming a saved draft can return the wizard to the Describe step. In
     // that case, continue the existing idea instead of creating a duplicate.
     if (created) {
@@ -1039,6 +1081,7 @@ export function EmployeeIdeaSubmissionPage({
     setTitle(initialTitle);
     setSummary(initialSummary);
     setDetails(initialDetails);
+    aiRequestLock.current = true;
     setDevelopmentError(null);
     setAiAction("enrich");
     dispatch(setIdeaWizardStep(2));
@@ -1057,19 +1100,31 @@ export function EmployeeIdeaSubmissionPage({
         differentiation: differentiation.trim() || undefined,
       });
       setCreated(draft);
-      await developmentMutation.mutateAsync({ id: draft.idea.id, action: "enrich" });
+      const queuedRun = await developmentMutation.mutateAsync({ id: draft.idea.id, action: "enrich" });
+      if (queuedRun.pending) {
+        setActiveDevelopmentRun({
+          runId: queuedRun.runId,
+          versionId: queuedRun.versionId,
+          action: "enrich",
+        });
+      }
     } catch (error) {
       setDevelopmentError(errorMessage(error));
     } finally {
+      aiRequestLock.current = false;
       setAiAction(null);
     }
   };
   const finishSubmit = async (id: number, versionId: number, humanReview = submitForHumanReview) => {
+    if (finalizeRequestLock.current) return;
+    finalizeRequestLock.current = true;
     try {
       const result = await submitMutation.mutateAsync({ id, versionId, submitForHumanReview: humanReview });
       setSubmitResult(result);
     } catch (error) {
       setSubmitError(error);
+    } finally {
+      finalizeRequestLock.current = false;
     }
   };
   useEffect(() => {
@@ -1094,6 +1149,7 @@ export function EmployeeIdeaSubmissionPage({
     submitForHumanReview,
   ]);
   const submit = async (humanReview = false) => {
+    if (submitRequestLock.current) return;
     if (
       !fieldsValid ||
       busy ||
@@ -1111,6 +1167,7 @@ export function EmployeeIdeaSubmissionPage({
       return;
     }
     setSubmitError(null);
+    submitRequestLock.current = true;
     try {
       // The current idea version is already saved and was validated. Calling
       // syncDraft here would create a new version after validation, so the API
@@ -1125,7 +1182,15 @@ export function EmployeeIdeaSubmissionPage({
       await finishSubmit(result.idea.id, result.versionId, humanReview);
     } catch {
       /* the mutation error is rendered below */
+    } finally {
+      submitRequestLock.current = false;
     }
+  };
+
+  const checkPassOrFail = async () => {
+    if (!requiredQuestionsAnswered || aiRequestLock.current || validationInProgress) return;
+    dispatch(setIdeaWizardStep(4));
+    await requestDevelopment("validate");
   };
   if (created && submitResult) {
     const completed = Boolean(submitResult?.submitted);
@@ -1237,7 +1302,7 @@ export function EmployeeIdeaSubmissionPage({
               )}
             </div>
           )}
-          {!completed && !failed && <p className="mt-3 text-sm text-muted" aria-live="polite">Finishing your submission…</p>}
+          {!completed && !failed && <WizardProgressPanel title="Finishing your submission" detail="Your answers are saved. We’re completing the final checks and registering the idea." />}
           {(submissionReadinessQuery.isError || Boolean(submitError)) && (
             <p
               className="mx-auto mt-3 max-w-[52ch] text-sm text-[#d6336c]"
@@ -1315,15 +1380,24 @@ export function EmployeeIdeaSubmissionPage({
               disabled={
                 title.trim().length < 3 ||
                 summary.trim().length < 10 ||
+                aiRequestLock.current ||
+                aiAction !== null ||
+                activeRunInProgress ||
                 createMutation.isPending ||
                 draftMutation.isPending ||
                 developmentMutation.isPending || enrichmentRun?.pending
               }
               onClick={() => void requestDevelopment("enrich")}
             >
-              <><Icon name="spark" className="mr-2 inline-block h-4 w-4" />Improve with AI</>
+              {aiAction === "enrich" || enrichmentInProgress ? "Improving with AI…" : <><Icon name="spark" className="mr-2 inline-block h-4 w-4" />Improve with AI</>}
             </button>
           </div>
+          {(aiAction === "enrich" || enrichmentInProgress) && (
+            <WizardProgressPanel
+              title={created ? "Improving your idea" : "Preparing your idea"}
+              detail={created ? "AI is refining the wording and developing the idea. Your current draft stays saved in this step." : "Saving your draft and asking AI to shape the first version."}
+            />
+          )}
           <div className="mt-4 flex min-h-[50px] flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-3 text-xs text-muted" style={{ borderColor: "var(--line)" }}>
             <span>Area of enhancement <b className="ml-1 rounded-full bg-blue/10 px-2 py-1 text-blue">Customer</b></span>
             <span>Assigned automatically. Re-checked when you submit.</span>
@@ -1381,10 +1455,16 @@ export function EmployeeIdeaSubmissionPage({
           )}
           <div className="mt-4 flex flex-wrap gap-2">
             <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(1))}>Back to describe</button>
-            <button className="btn-primary" type="button" disabled={title.trim().length < 3 || summary.trim().length < 10 || developmentMutation.isPending || pendingQuestions || questionsRun?.pending} onClick={() => void prepareReviewerQuestions()}>
-              Generate idea-specific questions
+            <button className="btn-primary" type="button" disabled={title.trim().length < 3 || summary.trim().length < 10 || aiAction !== null || activeRunInProgress || developmentMutation.isPending || pendingQuestions || questionsRun?.pending} onClick={() => void prepareReviewerQuestions()}>
+              {questionsInProgress ? "Preparing questions…" : "Generate idea-specific questions"}
             </button>
           </div>
+          {questionsInProgress && (
+            <WizardProgressPanel
+              title="Preparing questions for this idea"
+              detail="AI is creating follow-ups for the five review topics. Your draft and answers will stay in this wizard."
+            />
+          )}
           {questionError && (
             <div className="mt-3 rounded-xl border border-[#d6336c]/35 p-3 text-sm" role="alert">
               <p>{questionError}</p>
@@ -1443,7 +1523,7 @@ export function EmployeeIdeaSubmissionPage({
           )}
           <div className="mt-4 flex flex-wrap gap-2">
             <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(2))}>Back</button>
-            <button className="btn-primary" type="button" disabled={!requiredQuestionsAnswered} onClick={() => dispatch(setIdeaWizardStep(4))}><Icon name="shield" className="mr-2 inline h-4 w-4" />Check: pass or fail</button>
+            <button className="btn-primary" type="button" disabled={!requiredQuestionsAnswered || aiRequestLock.current || aiAction !== null || validationInProgress || developmentMutation.isPending} onClick={() => void checkPassOrFail()}>{validationInProgress || aiAction === "validate" ? "Checking with AI…" : <><Icon name="shield" className="mr-2 inline h-4 w-4" />Check: pass or fail</>}</button>
           </div>
         </section>
       )}
@@ -1468,11 +1548,17 @@ export function EmployeeIdeaSubmissionPage({
               </p>
             </div>
           </div>
+          {(aiAction === "validate" || validationInProgress) && (
+            <WizardProgressPanel
+              title="Assessing your idea"
+              detail="AI is checking the current saved draft against the bank’s criteria. This result will be tied to this draft version."
+            />
+          )}
           {validationRun?.failed && !validationInProgress && <p className="mt-4 rounded-lg border border-[#d6336c]/40 px-3 py-2 text-sm text-[#d6336c]" role="alert">This check could not be completed. Run it again before continuing.</p>}
           {!validation && !validationInProgress && (
             <div className="mt-5 rounded-xl border px-4 py-4 text-sm" style={{ borderColor: "var(--line)" }}>
               <p className="text-muted">{validation ? "Your draft has changed since this result. Save the latest draft and run the AI check again." : "Your idea is ready for the AI pass or fail check."}</p>
-              <button className="btn-primary mt-3" type="button" disabled={busy || developmentMutation.isPending || validationInProgress || title.trim().length < 3 || summary.trim().length < 10} onClick={() => void requestDevelopment("validate")}>{validation ? "Check the updated draft" : "Check: pass or fail"}</button>
+              <button className="btn-primary mt-3" type="button" disabled={busy || aiAction !== null || activeRunInProgress || developmentMutation.isPending || validationInProgress || title.trim().length < 3 || summary.trim().length < 10} onClick={() => void requestDevelopment("validate")}>{aiAction === "validate" || validationInProgress ? "Checking with AI…" : validation ? "Check the updated draft" : "Check: pass or fail"}</button>
             </div>
           )}
           {validation && validationBreakdown && (
@@ -1541,8 +1627,8 @@ export function EmployeeIdeaSubmissionPage({
           <div className="mt-5 flex flex-wrap items-center gap-2">
             {validation && !validationPassed && <>
               <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(2))}>Edit draft</button>
-              <button className="btn" type="button" disabled={aiAction === "validate" || developmentMutation.isPending} onClick={() => { dispatch(setIdeaWizardStep(2)); void requestDevelopment("enrich"); }}>Improve with AI</button>
-              <button className="btn-primary" type="button" disabled={aiAction === "validate" || developmentMutation.isPending || title.trim().length < 3 || summary.trim().length < 10} onClick={() => void requestDevelopment("validate")}>Check with AI again</button>
+              <button className="btn" type="button" disabled={aiAction !== null || activeRunInProgress || developmentMutation.isPending} onClick={() => { dispatch(setIdeaWizardStep(2)); void requestDevelopment("enrich"); }}>{aiAction === "enrich" || enrichmentInProgress ? "Improving with AI…" : "Improve with AI"}</button>
+              <button className="btn-primary" type="button" disabled={aiAction !== null || activeRunInProgress || developmentMutation.isPending || title.trim().length < 3 || summary.trim().length < 10} onClick={() => void requestDevelopment("validate")}>{aiAction === "validate" || validationInProgress ? "Checking with AI…" : "Check with AI again"}</button>
             </>}
             {canSubmitForHumanReview
               ? <button className="btn-primary" type="button" onClick={() => dispatch(setIdeaWizardStep(5))}>Continue to human review</button>
@@ -1576,8 +1662,9 @@ export function EmployeeIdeaSubmissionPage({
           {Boolean(submissionError) && <div className="mt-4 rounded-xl border border-[#d6336c]/40 p-4 text-sm" role="alert"><p className="font-medium text-[#d6336c]">{errorMessage(submissionError)}</p>{submissionRejection && priorityScoreRejected && <p className="mt-1">Server score / minimum: {submissionRejection.score?.toFixed(2) ?? "—"} / {submissionRejection.minimumScore?.toFixed(2) ?? "—"}{submissionRejection.priorityBand ? ` · ${submissionRejection.priorityBand}` : ""}</p>}{submissionRejection?.breakdown.map((item) => <p className="mt-1 flex justify-between gap-3" key={item.key}><span className="capitalize">{item.key} · {Math.round(item.weight * 100)}%</span><span>{item.score.toFixed(1)} → {item.contribution.toFixed(2)}</span></p>)}{priorityScoreRejected && <p className="mt-2 text-muted">Adjust the impact numbers to meet the server minimum, then submit again.</p>}</div>}
           <div className="mt-4 flex flex-wrap gap-2">
             <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(4))}>Back to validation</button>
-            <button className="btn-primary" type="button" disabled={!fieldsValid || busy || validationBlocked || !priorityResult || priorityResult.score < priorityPolicyQuery.data!.minimumScore} onClick={() => void submit(canSubmitForHumanReview && !validationPassed)}>{busy ? "Submitting…" : canSubmitForHumanReview && !validationPassed ? "Submit for human review" : "Submit idea"}</button>
+            <button className="btn-primary" type="button" disabled={!fieldsValid || busy || submitRequestLock.current || validationBlocked || !priorityResult || priorityResult.score < priorityPolicyQuery.data!.minimumScore} onClick={() => void submit(canSubmitForHumanReview && !validationPassed)}>{busy ? "Submitting…" : canSubmitForHumanReview && !validationPassed ? "Submit for human review" : "Submit idea"}</button>
           </div>
+          {busy && <WizardProgressPanel title="Submitting your idea" detail={saveSubmissionMutation.isPending ? "Saving your answers and impact estimates." : "Registering your idea and finalizing its submission."} />}
         </section>
       )}
       {step === 1 && (
