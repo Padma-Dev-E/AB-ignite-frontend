@@ -26,6 +26,7 @@ import { AdminEvidenceExports, AuditCsvDownload, OperationsAnalytics } from "./a
 import { AdminQueueTable } from "./admin-transformation-queues";
 import { AdminShell, visibleAdminViews, type AdminView } from "./admin-shell";
 import { AdminAiPrompts } from "./admin-ai-prompts";
+import { AdminAiActivity } from "./admin-ai-activity";
 import type {
   AdminAuditEvent,
 } from "../types";
@@ -349,6 +350,7 @@ export function AdminWorkspace({ email }: AdminWorkspaceProps) {
     case "users": content = <PeoplePanel currentUserId={currentUserId} />; break;
     case "settings": content = <SettingsPanel />; break;
     case "ai-prompts": content = role === "back_office" ? <AdminAiPrompts /> : null; break;
+    case "ai-activity": content = role === "back_office" ? <AdminAiActivity /> : null; break;
     case "audit": content = <AuditPanel role={role} />; break;
   }
   return <AdminShell email={email} name={session.user.name} role={role} views={views} active={active} onNavigate={setRequestedView}>{content}</AdminShell>;

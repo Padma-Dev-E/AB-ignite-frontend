@@ -3,6 +3,7 @@ import { withBasePath } from "../../lib/routing/base-path";
 import type {
   AdminAuditEvent,
   AdminAiDiagnostics,
+  AdminAiRun,
   AdminChallenge,
   AdminEvaluationDetail,
   AdminFeedbackResponse,
@@ -18,6 +19,10 @@ type ListResponse<T> = { items: T[] };
 
 export function getAdminAiDiagnostics(ideaId: number) {
   return apiFetch<AdminAiDiagnostics>(`/api/admin/governance/evaluations/${ideaId}/ai-diagnostics`);
+}
+
+export function listAdminAiRuns() {
+  return apiFetch<AdminAiRun[]>("/api/admin/ai/runs");
 }
 
 export function listAdminQuizCatalogue() {

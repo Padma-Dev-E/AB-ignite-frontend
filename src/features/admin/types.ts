@@ -115,6 +115,20 @@ export type AdminAiDiagnostics = {
   exchanges: AdminAiDebugExchange[];
 };
 
+export type AdminAiRun = {
+  id: number;
+  ideaId: number;
+  jobKey: string;
+  jobVersion: string;
+  model: string;
+  status: string;
+  attemptCount: number;
+  errorCode: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+};
+
 export type AdminFeedbackResponse = {
   id: number;
   campaignId: number;

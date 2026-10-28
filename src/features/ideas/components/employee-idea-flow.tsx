@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import React from "react";
+import { useSession } from "next-auth/react";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { useDispatch, useSelector } from "react-redux";
 import { ApiError } from "../../../lib/api/client";
@@ -45,6 +46,7 @@ import type {
 
 import { useEmployeeProfile } from "../../employee/profile-hooks";
 import { useLearningChallenges, useLearningJourney, useLearningRankings } from "../../learning/hooks";
+import { AdminAiDiagnosticsPanel } from "../../admin/components/admin-evaluation";
 
 type Page =
   | "community"
@@ -583,6 +585,8 @@ export function EmployeeIdeaSubmissionPage({
 }: {
   onOpenIdea: (id: number) => void;
 }) {
+  const { data: session } = useSession();
+  const canViewAiDiagnostics = session?.user?.role === "back_office";
   const dispatch = useDispatch<AppDispatch>();
   const step = useSelector((state: RootState) => state.ui.ideaWizardStep);
   const [kind, setKind] = useState<IdeaKind>("idea");
@@ -1251,7 +1255,7 @@ export function EmployeeIdeaSubmissionPage({
               {submitMutation.isPending ||
               preflight?.status === "queued" ||
               preflight?.status === "running"
-                ? "Checking originality and safety…"
+                ? `Checking originality and safety…${preflight?.attemptCount && preflight.attemptCount > 1 ? ` Attempt ${preflight.attemptCount}.` : ""}`
                 : "Waiting for the preflight result…"}
             </p>
           )}
@@ -1300,6 +1304,7 @@ export function EmployeeIdeaSubmissionPage({
             )}
           </div>
         </section>
+        {canViewAiDiagnostics && <AdminAiDiagnosticsPanel ideaId={created.idea.id} />}
       </div>
     );
   }
@@ -1312,6 +1317,7 @@ export function EmployeeIdeaSubmissionPage({
         </div>
       </section>}
       <IdeaStepBar step={step} />
+      {created && canViewAiDiagnostics && <AdminAiDiagnosticsPanel ideaId={created.idea.id} />}
       {step === 2 && (
         <div className="flex flex-wrap items-start gap-2 rounded-xl border px-4 py-[11px] text-[13px]" style={{ borderColor: "var(--line)" }} role="status">
           <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-[#0e9f7a]" />
