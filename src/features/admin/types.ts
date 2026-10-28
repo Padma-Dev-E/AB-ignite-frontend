@@ -90,6 +90,31 @@ export type AdminEvaluationDetail = {
   controlReview: { required: string[]; approved: string[]; pending: string[] } | null;
 };
 
+export type AdminAiDebugExchange = {
+  id: number;
+  runId: number;
+  jobKey: string;
+  runStatus: string;
+  attempt: number;
+  responseStatus: number | null;
+  responseStatusText: string | null;
+  responseTruncated: boolean;
+  durationMs: number;
+  processingStage: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  requestPayload: string | null;
+  responsePayload: string | null;
+  createdAt: string;
+  expiresAt: string;
+};
+
+export type AdminAiDiagnostics = {
+  enabled: boolean;
+  retentionHours: number;
+  exchanges: AdminAiDebugExchange[];
+};
+
 export type AdminFeedbackResponse = {
   id: number;
   campaignId: number;

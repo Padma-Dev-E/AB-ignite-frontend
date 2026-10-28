@@ -1405,8 +1405,7 @@ export function EmployeeIdeaSubmissionPage({
               enrichmentRun.status,
             ) && (
               <p className="mt-3 text-sm text-[#d6336c]" role="alert">
-                Suggestions could not be completed. Complete the structure
-                manually.
+                {enrichmentRun.errorMessage || "Suggestions could not be completed. Complete the structure manually."}
               </p>
             )}
           {enrichment && appliedRunId !== enrichmentRun?.id && <div className="mt-3"><p className="text-sm text-muted">AI improvements are ready. Applying them will replace the current wording; all fields remain editable.</p><button className="btn mt-2" onClick={applyEnrichment}>Apply AI improvements</button></div>}

@@ -2,6 +2,7 @@ import { apiFetch } from "../../lib/api/client";
 import { withBasePath } from "../../lib/routing/base-path";
 import type {
   AdminAuditEvent,
+  AdminAiDiagnostics,
   AdminChallenge,
   AdminEvaluationDetail,
   AdminFeedbackResponse,
@@ -14,6 +15,10 @@ import type {
 } from "./types";
 
 type ListResponse<T> = { items: T[] };
+
+export function getAdminAiDiagnostics(ideaId: number) {
+  return apiFetch<AdminAiDiagnostics>(`/api/admin/governance/evaluations/${ideaId}/ai-diagnostics`);
+}
 
 export function listAdminQuizCatalogue() {
   return apiFetch<ListResponse<AdminQuiz>>("/api/quizzes");
