@@ -1,5 +1,5 @@
 import { apiFetch } from "../../lib/api/client";
-import type { CommentListResponse, Idea, IdeaAiStatusResponse, IdeaComment, IdeaCreateInput, IdeaCreateResponse, IdeaDetailResponse, IdeaDevelopmentRun, IdeaListParams, IdeaListResponse, IdeaPriorityPolicy, IdeaSubmissionInput, IdeaSubmitResponse, IdeaUpdateInput, SupportResponse } from "./types";
+import type { CommentListResponse, Idea, IdeaComment, IdeaCreateInput, IdeaCreateResponse, IdeaDetailResponse, IdeaDevelopmentRun, IdeaListParams, IdeaListResponse, IdeaPriorityPolicy, IdeaSubmissionInput, IdeaSubmissionReadiness, IdeaSubmitResponse, IdeaUpdateInput, SupportResponse } from "./types";
 
 function queryString(params: Record<string, string | number | boolean | undefined>) {
   const query = new URLSearchParams();
@@ -15,10 +15,10 @@ export function submitIdea(id: number, versionId?: number, submitForHumanReview 
 export function saveIdeaSubmission(id: number, input: IdeaSubmissionInput) { return apiFetch<{ score: number; minimumScore: number; answers: IdeaSubmissionInput["answers"]; metrics: IdeaSubmissionInput["metrics"] }>(`/api/ideas/${id}/submission`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }); }
 export function getIdea(id: number, params: { page?: number; pageSize?: number } = {}) { return apiFetch<IdeaDetailResponse>(`/api/ideas/${id}${queryString(params)}`); }
 export function deleteIdeaDraft(id: number) { return apiFetch<{ id: number; deleted: true }>(`/api/ideas/${id}`, { method: "DELETE" }); }
-export function getIdeaAiStatus(id: number) { return apiFetch<IdeaAiStatusResponse>(`/api/ideas/${id}/ai-status`); }
+export function getIdeaSubmissionReadiness(id: number) { return apiFetch<IdeaSubmissionReadiness>(`/api/ideas/${id}/submission-readiness`); }
 export function getIdeaDevelopment(id: number) { return apiFetch<{ runs: IdeaDevelopmentRun[] }>(`/api/ideas/${id}/development`); }
 export function updateIdeaDraft(id: number, input: IdeaUpdateInput) { return apiFetch<{ idea: Idea; versionId: number }>(`/api/ideas/${id}/development`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "update", input }) }); }
-export function queueIdeaDevelopment(id: number, action: "enrich" | "questions" | "validate", context?: { answers?: Record<string, string>; differentiation?: string }) { return apiFetch<{ runId: number; status: string; versionId: number }>(`/api/ideas/${id}/development`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ...(action === "validate" ? context : {}) }) }); }
+export function queueIdeaDevelopment(id: number, action: "enrich" | "questions" | "validate", context?: { answers?: Record<string, string>; differentiation?: string }) { return apiFetch<{ runId: number; pending: boolean; versionId: number }>(`/api/ideas/${id}/development`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ...(action === "validate" ? context : {}) }) }); }
 export function updateIdea(id: number, input: IdeaUpdateInput) { return apiFetch<{ idea: Idea; version: unknown }>(`/api/ideas/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }); }
 export function listIdeaComments(id: number, params: { page?: number; pageSize?: number } = {}) { return apiFetch<CommentListResponse>(`/api/ideas/${id}/comments${queryString(params)}`); }
 export function addIdeaComment(id: number, body: string) { return apiFetch<IdeaComment>(`/api/ideas/${id}/comments`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body }) }); }

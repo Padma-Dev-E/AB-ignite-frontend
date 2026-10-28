@@ -1,6 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import { appBasePath, stripBasePath, withBasePath } from "../lib/routing/base-path";
-export type UserRole = "employee" | "back_office" | "business_owner";
+export type UserRole = "employee" | "admin" | "maintainer" | "business_owner";
 
 // This cookie name is shared with Fastify so it can validate Auth.js sessions.
 export const SESSION_COOKIE_NAME = process.env.AUTH_SESSION_COOKIE_NAME ?? "ab_ignite_session";
@@ -27,11 +27,18 @@ function shouldUseSecureCookies() {
 export const secureCookies = shouldUseSecureCookies();
 
 export function canAccessAdminWorkspace(role: UserRole | undefined): boolean {
-  return role === "back_office" || role === "business_owner";
+  return role === "admin" || role === "maintainer" || role === "business_owner";
 }
 
 export function postLoginPath(role: UserRole): string {
   return role === "employee" ? "/private" : "/private/admin";
+}
+
+export function userRoleLabel(role: string | undefined): string {
+  if (role === "business_owner") return "Business owner";
+  if (role === "maintainer") return "Maintainer";
+  if (role === "admin") return "Admin";
+  return "Employee";
 }
 
 export function forcedPasswordChangePathAllowed(pathname: string): boolean {

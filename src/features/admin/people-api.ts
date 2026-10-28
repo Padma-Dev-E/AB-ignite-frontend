@@ -36,7 +36,7 @@ function json(body: unknown): RequestInit {
 
 export type AdminRole = AdminUser["role"];
 const auditMessage = (action: string) => `Automatically recorded admin action: ${action}.`;
-export function createPerson(input: { name: string; email: string; department: string; jobTitle?: string; role: AdminRole }) {
+export function createPerson(input: { name: string; email: string; department: string; jobTitle?: string; businessProfile?: string; role: AdminRole }) {
   return apiFetch<{ user: AdminUser; temporaryPassword: string }>("/api/admin/users", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...input, reason: auditMessage("user created") }) });
 }
 export function updatePersonRole(userId: number, role: AdminRole) {

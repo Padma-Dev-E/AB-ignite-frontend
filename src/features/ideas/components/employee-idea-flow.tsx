@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import React from "react";
-import { useSession } from "next-auth/react";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { useDispatch, useSelector } from "react-redux";
 import { ApiError } from "../../../lib/api/client";
@@ -15,10 +14,10 @@ import {
   useCreateIdea,
   useDeleteIdeaDraft,
   useIdea,
-  useIdeaAiStatus,
   useIdeaComments,
   useIdeaDevelopment,
   useIdeaPriorityPolicy,
+  useIdeaSubmissionReadiness,
   useIdeas,
   useQueueIdeaDevelopment,
   useSaveIdeaSubmission,
@@ -46,7 +45,6 @@ import type {
 
 import { useEmployeeProfile } from "../../employee/profile-hooks";
 import { useLearningChallenges, useLearningJourney, useLearningRankings } from "../../learning/hooks";
-import { AdminAiDiagnosticsPanel } from "../../admin/components/admin-evaluation";
 
 type Page =
   | "community"
@@ -585,8 +583,6 @@ export function EmployeeIdeaSubmissionPage({
 }: {
   onOpenIdea: (id: number) => void;
 }) {
-  const { data: session } = useSession();
-  const canViewAiDiagnostics = session?.user?.role === "back_office";
   const dispatch = useDispatch<AppDispatch>();
   const step = useSelector((state: RootState) => state.ui.ideaWizardStep);
   const [kind, setKind] = useState<IdeaKind>("idea");
@@ -670,7 +666,7 @@ export function EmployeeIdeaSubmissionPage({
     !buildsOnId &&
     differentiation.trim().length < 20,
   );
-  const aiStatusQuery = useIdeaAiStatus(
+  const submissionReadinessQuery = useIdeaSubmissionReadiness(
     created?.idea.id ?? 0,
     Boolean(created && submitResult && !submitResult.submitted),
   );
@@ -684,8 +680,7 @@ export function EmployeeIdeaSubmissionPage({
     (run) => run.ideaVersionId === created?.versionId,
   );
   const latestCurrentRun = (jobKey: string) => currentRuns
-    .filter((run) => run.jobKey === jobKey)
-    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0];
+    .find((run) => run.jobKey === jobKey);
   const enrichmentRun = latestCurrentRun("idea.enrich");
   const validationRun = latestCurrentRun("idea.validate");
   const questionsRun = latestCurrentRun("idea.questions");
@@ -697,22 +692,21 @@ export function EmployeeIdeaSubmissionPage({
     : undefined;
   const activeRunInProgress = Boolean(
     activeRunIsCurrent &&
-    (!matchingActiveRun || matchingActiveRun.status === "queued" || matchingActiveRun.status === "running"),
+    (!matchingActiveRun || matchingActiveRun.pending),
   );
   const validationInProgress = Boolean(
     (activeRunInProgress && activeDevelopmentRun?.action === "validate") ||
-    validationRun?.status === "queued" ||
-    validationRun?.status === "running",
+    validationRun?.pending,
   );
   const enrichment =
-    enrichmentRun?.status === "succeeded"
+    enrichmentRun?.completed
       ? (enrichmentRun.result as (IdeaEnrichment & { solutionStatement?: string; riskStatement?: string }) | null)
       : null;
   const validation =
-    validationRun?.status === "succeeded" && !(activeRunInProgress && activeDevelopmentRun?.action === "validate")
+    validationRun?.completed && !(activeRunInProgress && activeDevelopmentRun?.action === "validate")
       ? (validationRun.result as IdeaValidation | null)
       : null;
-  const generatedQuestionData = questionsRun?.status === "succeeded"
+  const generatedQuestionData = questionsRun?.completed
     ? (questionsRun.result as IdeaQuestions | null)
     : null;
   const reviewerQuestions: IdeaClarifyingQuestion[] = (generatedQuestionData?.questions ?? []).slice().sort((left, right) => {
@@ -724,7 +718,7 @@ export function EmployeeIdeaSubmissionPage({
   const validationPassed = ideaValidationPasses(validation);
   const validationBreakdown = validation ? getValidationBreakdown(validation) : null;
   const lowValidationRuns = allIdeaRuns.filter((run) => {
-    if (run.jobKey !== "idea.validate" || run.status !== "succeeded" || run.ideaVersionId <= 0) return false;
+    if (run.jobKey !== "idea.validate" || !run.completed || run.ideaVersionId <= 0) return false;
     const result = run.result as IdeaValidation | null;
     const score = normalizeIdeaValidationScore(result?.overallScore);
     return score !== null && score <= 7;
@@ -837,7 +831,7 @@ export function EmployeeIdeaSubmissionPage({
       setSubmitResult({
         ideaId: idea.id,
         versionId: detail.versionId,
-        status: detail.pendingSubmission.status,
+        status: "pending",
         submitted: false,
       });
     } else {
@@ -865,7 +859,7 @@ export function EmployeeIdeaSubmissionPage({
   }, [appliedRunId, enrichment, enrichmentRun]);
   useEffect(() => {
     if (
-      validationRun?.status === "succeeded" &&
+      validationRun?.completed &&
       validation &&
       created &&
       validationRun.ideaVersionId === created.versionId
@@ -881,7 +875,7 @@ export function EmployeeIdeaSubmissionPage({
       return;
     }
     const run = allIdeaRuns.find((candidate) => candidate.id === activeDevelopmentRun.runId);
-    if (run && !["queued", "running"].includes(run.status)) {
+    if (run && !run.pending) {
       setActiveDevelopmentRun(null);
     }
   }, [activeDevelopmentRun, allIdeaRuns, created]);
@@ -889,9 +883,8 @@ export function EmployeeIdeaSubmissionPage({
   useEffect(() => {
     if (!pendingQuestions || questionVersionId === null) return;
     const questionRun = currentRuns
-      .filter((run) => run.jobKey === "idea.questions" && run.ideaVersionId === questionVersionId)
-      .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0];
-    if (questionRun?.status === "succeeded") {
+      .find((run) => run.jobKey === "idea.questions" && run.ideaVersionId === questionVersionId);
+    if (questionRun?.completed) {
       const result = questionRun.result as IdeaQuestions | null;
       const questions = result?.questions ?? [];
       setQuestionAnswers((current) => Object.fromEntries(
@@ -906,7 +899,7 @@ export function EmployeeIdeaSubmissionPage({
     }
     if (
       questionRun &&
-      ["failed", "timed_out", "cancelled"].includes(questionRun.status)
+      questionRun.failed
     ) {
       setPendingQuestions(false);
       setQuestionVersionId(null);
@@ -986,7 +979,7 @@ export function EmployeeIdeaSubmissionPage({
         action,
         ...(action === "validate" ? { context: { answers: questionAnswers, differentiation } } : {}),
       });
-      if (queuedRun.status === "queued" || queuedRun.status === "running") {
+      if (queuedRun.pending) {
         setActiveDevelopmentRun({
           runId: queuedRun.runId,
           versionId: queuedRun.versionId,
@@ -1088,15 +1081,12 @@ export function EmployeeIdeaSubmissionPage({
       submitMutation.isPending
     )
       return;
-    const preflight = aiStatusQuery.data?.runs.find(
-      (run) => run.jobKey === "idea.preflight",
-    );
-    if (preflight?.status === "succeeded")
+    if (submissionReadinessQuery.data?.canFinalize)
       void finishSubmit(created.idea.id, created.versionId, submitForHumanReview).catch(
         () => undefined,
       );
   }, [
-    aiStatusQuery.data,
+    submissionReadinessQuery.data,
     created,
     submitResult,
     submitError,
@@ -1138,14 +1128,11 @@ export function EmployeeIdeaSubmissionPage({
     }
   };
   if (created && submitResult) {
-    const preflight = aiStatusQuery.data?.runs.find(
-      (run) => run.jobKey === "idea.preflight",
-    );
     const completed = Boolean(submitResult?.submitted);
     const failed = Boolean(
       submitError ||
-      (preflight &&
-        ["failed", "timed_out", "cancelled"].includes(preflight.status)),
+      submissionReadinessQuery.isError ||
+      submissionReadinessQuery.data?.needsAttention,
     );
     return (
       <div className="stack">
@@ -1170,7 +1157,7 @@ export function EmployeeIdeaSubmissionPage({
               ? "Idea submitted"
               : failed
                 ? "Validation needs attention"
-                : "Idea received — validation queued"}
+                : "Idea received — submission in progress"}
           </h1>
           <p className="mx-auto mt-2 max-w-[52ch] text-muted">
             {completed ? (
@@ -1183,7 +1170,7 @@ export function EmployeeIdeaSubmissionPage({
             ) : failed ? (
               "The server could not complete validation or submission. Your idea is saved; review the message and try again if appropriate."
             ) : (
-              `Reference ${created.idea.reference}. The server is checking your idea before it is submitted.`
+              `Reference ${created.idea.reference}. Your submission is being finalized.`
             )}
           </p>
           {completed && (
@@ -1250,26 +1237,18 @@ export function EmployeeIdeaSubmissionPage({
               )}
             </div>
           )}
-          {!completed && !failed && (
-            <p className="mt-3 text-sm text-muted" aria-live="polite">
-              {submitMutation.isPending ||
-              preflight?.status === "queued" ||
-              preflight?.status === "running"
-                ? `Checking originality and safety…${preflight?.attemptCount && preflight.attemptCount > 1 ? ` Attempt ${preflight.attemptCount}.` : ""}`
-                : "Waiting for the preflight result…"}
-            </p>
-          )}
-          {(aiStatusQuery.isError || Boolean(submitError)) && (
+          {!completed && !failed && <p className="mt-3 text-sm text-muted" aria-live="polite">Finishing your submission…</p>}
+          {(submissionReadinessQuery.isError || Boolean(submitError)) && (
             <p
               className="mx-auto mt-3 max-w-[52ch] text-sm text-[#d6336c]"
               role="alert"
             >
-              {errorMessage(aiStatusQuery.error ?? submitError)}
+              {errorMessage(submissionReadinessQuery.error ?? submitError)}
             </p>
           )}
           <div className="mt-5 flex flex-wrap justify-center gap-2">
-            {failed && preflight?.status === "succeeded" && <button className="btn" type="button" disabled={submitMutation.isPending} onClick={() => setSubmitError(null)}>{submitMutation.isPending ? "Retrying…" : "Retry submission"}</button>}
-            {failed && preflight?.status !== "succeeded" && <button className="btn" type="button" onClick={() => { setSubmitResult(null); setSubmitError(null); dispatch(setIdeaWizardStep(2)); }}>Improve draft</button>}
+            {failed && submissionReadinessQuery.data?.canFinalize && <button className="btn" type="button" disabled={submitMutation.isPending} onClick={() => setSubmitError(null)}>{submitMutation.isPending ? "Retrying…" : "Retry submission"}</button>}
+            {failed && !submissionReadinessQuery.data?.canFinalize && <button className="btn" type="button" onClick={() => { setSubmitResult(null); setSubmitError(null); dispatch(setIdeaWizardStep(2)); }}>Improve draft</button>}
             {completed && (
               <button
                 className="btn"
@@ -1304,7 +1283,6 @@ export function EmployeeIdeaSubmissionPage({
             )}
           </div>
         </section>
-        {canViewAiDiagnostics && <AdminAiDiagnosticsPanel ideaId={created.idea.id} />}
       </div>
     );
   }
@@ -1317,7 +1295,6 @@ export function EmployeeIdeaSubmissionPage({
         </div>
       </section>}
       <IdeaStepBar step={step} />
-      {created && canViewAiDiagnostics && <AdminAiDiagnosticsPanel ideaId={created.idea.id} />}
       {step === 2 && (
         <div className="flex flex-wrap items-start gap-2 rounded-xl border px-4 py-[11px] text-[13px]" style={{ borderColor: "var(--line)" }} role="status">
           <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-[#0e9f7a]" />
@@ -1340,24 +1317,13 @@ export function EmployeeIdeaSubmissionPage({
                 summary.trim().length < 10 ||
                 createMutation.isPending ||
                 draftMutation.isPending ||
-                developmentMutation.isPending
+                developmentMutation.isPending || enrichmentRun?.pending
               }
               onClick={() => void requestDevelopment("enrich")}
             >
-              {aiAction === "enrich" || createMutation.isPending || draftMutation.isPending || developmentMutation.isPending
-                ? "Improving…"
-                : <><Icon name="spark" className="mr-2 inline-block h-4 w-4" />Improve with AI</>}
+              <><Icon name="spark" className="mr-2 inline-block h-4 w-4" />Improve with AI</>
             </button>
           </div>
-          {(aiAction === "enrich" || enrichmentRun?.status === "queued" || enrichmentRun?.status === "running") && (
-            <div className="mt-4 flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: "var(--line)" }} role="status" aria-live="polite">
-              <span className="mt-0.5 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-blue/25 border-t-blue" aria-hidden="true" />
-              <div>
-                <p className="font-medium">{enrichmentRun?.status === "running" ? "AI is developing your idea" : "Checking originality and developing your idea"}</p>
-                <p className="mt-1 text-sm text-muted">We’re shaping your title, summary, problem, solution, benefits, and risks. You can review and edit every field when the draft is ready.</p>
-              </div>
-            </div>
-          )}
           <div className="mt-4 flex min-h-[50px] flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-3 text-xs text-muted" style={{ borderColor: "var(--line)" }}>
             <span>Area of enhancement <b className="ml-1 rounded-full bg-blue/10 px-2 py-1 text-blue">Customer</b></span>
             <span>Assigned automatically. Re-checked when you submit.</span>
@@ -1395,25 +1361,7 @@ export function EmployeeIdeaSubmissionPage({
               </label>
             ))}
           </div>
-          {created && developmentQuery.isPending && aiAction === "enrich" && (
-            <p className="mt-3 text-sm text-muted" aria-live="polite">
-              Loading AI suggestions…
-            </p>
-          )}
-          {enrichmentRun &&
-            ["queued", "running"].includes(enrichmentRun.status) && (
-              <p className="mt-3 text-sm text-muted" aria-live="polite">
-                AI is developing suggestions for your draft…
-              </p>
-            )}
-          {enrichmentRun &&
-            ["failed", "timed_out", "cancelled"].includes(
-              enrichmentRun.status,
-            ) && (
-              <p className="mt-3 text-sm text-[#d6336c]" role="alert">
-                {enrichmentRun.errorMessage || "Suggestions could not be completed. Complete the structure manually."}
-              </p>
-            )}
+          {enrichmentRun?.failed && <p className="mt-3 text-sm text-[#d6336c]" role="alert">Suggestions could not be completed. Complete the structure manually or try again.</p>}
           {enrichment && appliedRunId !== enrichmentRun?.id && <div className="mt-3"><p className="text-sm text-muted">AI improvements are ready. Applying them will replace the current wording; all fields remain editable.</p><button className="btn mt-2" onClick={applyEnrichment}>Apply AI improvements</button></div>}
           {developmentQuery.isError && (
             <p className="mt-3 text-sm text-[#d6336c]" role="alert">
@@ -1433,24 +1381,15 @@ export function EmployeeIdeaSubmissionPage({
           )}
           <div className="mt-4 flex flex-wrap gap-2">
             <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(1))}>Back to describe</button>
-            <button className="btn-primary" type="button" disabled={title.trim().length < 3 || summary.trim().length < 10 || developmentMutation.isPending || pendingQuestions} onClick={() => void prepareReviewerQuestions()}>
-              {pendingQuestions || aiAction === "questions" ? "Generating idea-specific questions…" : "Generate questions with AI"}
+            <button className="btn-primary" type="button" disabled={title.trim().length < 3 || summary.trim().length < 10 || developmentMutation.isPending || pendingQuestions || questionsRun?.pending} onClick={() => void prepareReviewerQuestions()}>
+              Generate idea-specific questions
             </button>
           </div>
-          {(pendingQuestions || questionsRun?.status === "queued" || questionsRun?.status === "running") && (
-            <div className="mt-4 flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: "var(--line)" }} role="status" aria-live="polite">
-              <span className="mt-0.5 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-blue/25 border-t-blue" aria-hidden="true" />
-              <div>
-                <p className="font-medium">AI is reading your idea for missing details</p>
-                <p className="mt-1 text-sm text-muted">It will prepare only the follow-up questions needed for this draft.</p>
-              </div>
-            </div>
-          )}
           {questionError && (
             <div className="mt-3 rounded-xl border border-[#d6336c]/35 p-3 text-sm" role="alert">
               <p>{questionError}</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                <button className="btn btn-small" type="button" disabled={pendingQuestions} onClick={() => void prepareReviewerQuestions()}>{pendingQuestions ? "Retrying…" : "Retry AI questions"}</button>
+                <button className="btn btn-small" type="button" disabled={pendingQuestions} onClick={() => void prepareReviewerQuestions()}>Retry AI questions</button>
                 <button className="btn btn-small" type="button" onClick={proceedWithoutGeneratedQuestions}>Continue without questions</button>
               </div>
             </div>
@@ -1529,13 +1468,11 @@ export function EmployeeIdeaSubmissionPage({
               </p>
             </div>
           </div>
-          {created && developmentQuery.isPending && <p className="mt-4 text-sm text-muted" aria-live="polite">Loading validation…</p>}
-          {validationInProgress && <p className="mt-4 rounded-lg border px-3 py-2 text-sm text-muted" style={{ borderColor: "var(--line)" }} aria-live="polite">AI is reviewing the current draft…</p>}
-          {validationRun && ["failed", "timed_out", "cancelled"].includes(validationRun.status) && !validationInProgress && <p className="mt-4 rounded-lg border border-[#d6336c]/40 px-3 py-2 text-sm text-[#d6336c]" role="alert">{validationRun.errorMessage || "AI validation could not be completed. Run it again before continuing."}</p>}
+          {validationRun?.failed && !validationInProgress && <p className="mt-4 rounded-lg border border-[#d6336c]/40 px-3 py-2 text-sm text-[#d6336c]" role="alert">This check could not be completed. Run it again before continuing.</p>}
           {!validation && !validationInProgress && (
             <div className="mt-5 rounded-xl border px-4 py-4 text-sm" style={{ borderColor: "var(--line)" }}>
               <p className="text-muted">{validation ? "Your draft has changed since this result. Save the latest draft and run the AI check again." : "Your idea is ready for the AI pass or fail check."}</p>
-              <button className="btn-primary mt-3" type="button" disabled={busy || developmentMutation.isPending || title.trim().length < 3 || summary.trim().length < 10} onClick={() => void requestDevelopment("validate")}>{aiAction === "validate" || developmentMutation.isPending ? "Checking with AI…" : validation ? "Check the updated draft" : "Check: pass or fail"}</button>
+              <button className="btn-primary mt-3" type="button" disabled={busy || developmentMutation.isPending || validationInProgress || title.trim().length < 3 || summary.trim().length < 10} onClick={() => void requestDevelopment("validate")}>{validation ? "Check the updated draft" : "Check: pass or fail"}</button>
             </div>
           )}
           {validation && validationBreakdown && (
@@ -1579,7 +1516,7 @@ export function EmployeeIdeaSubmissionPage({
           {validation && validationPassed && validationIsCurrent && (
             <p className="mt-3 text-sm text-[#0e9f7a]" role="status">This result is for the current draft. You can continue to add the impact numbers.</p>
           )}
-          {validationRun?.status === "succeeded" && !validationIsCurrent && !validationInProgress && (
+          {validationRun?.completed && !validationIsCurrent && !validationInProgress && (
             <p className="mt-3 text-sm text-[#d6336c]" role="alert">
               This result belongs to an older draft. Run validation again for
               the current version.
@@ -1605,7 +1542,7 @@ export function EmployeeIdeaSubmissionPage({
             {validation && !validationPassed && <>
               <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(2))}>Edit draft</button>
               <button className="btn" type="button" disabled={aiAction === "validate" || developmentMutation.isPending} onClick={() => { dispatch(setIdeaWizardStep(2)); void requestDevelopment("enrich"); }}>Improve with AI</button>
-              <button className="btn-primary" type="button" disabled={aiAction === "validate" || developmentMutation.isPending || title.trim().length < 3 || summary.trim().length < 10} onClick={() => void requestDevelopment("validate")}>{aiAction === "validate" || developmentMutation.isPending ? "Checking…" : "Check with AI again"}</button>
+              <button className="btn-primary" type="button" disabled={aiAction === "validate" || developmentMutation.isPending || title.trim().length < 3 || summary.trim().length < 10} onClick={() => void requestDevelopment("validate")}>Check with AI again</button>
             </>}
             {canSubmitForHumanReview
               ? <button className="btn-primary" type="button" onClick={() => dispatch(setIdeaWizardStep(5))}>Continue to human review</button>

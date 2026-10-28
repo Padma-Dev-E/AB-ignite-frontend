@@ -27,6 +27,7 @@ import { AdminQueueTable } from "./admin-transformation-queues";
 import { AdminShell, visibleAdminViews, type AdminView } from "./admin-shell";
 import { AdminAiPrompts } from "./admin-ai-prompts";
 import { AdminAiActivity } from "./admin-ai-activity";
+import { AdminProgress } from "./admin-progress";
 import type {
   AdminAuditEvent,
 } from "../types";
@@ -38,7 +39,7 @@ type SubnavItem = { id: string; label: string };
 
 const governanceItems: SubnavItem[] = [
   { id: "screening", label: "Screening" },
-  { id: "transformation", label: "Transformation" },
+  { id: "progress", label: "Progress & assignment" },
 ];
 
 
@@ -150,29 +151,29 @@ export function DashboardPanel({ role }: { role?: UserRole }) {
   if (analytics.isError) return <StatePanel title="Dashboard unavailable" detail={queryMessage(analytics.error, "The dashboard could not be loaded.")} tone="error" />;
   const data = analytics.data;
   const count = (status: string) => data.ideasByStatus.find(item => item.status === status)?.count ?? 0;
-  return <div className="stack"><div><h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1><p className="mt-2 text-muted">A live summary of ideas moving through the back office.</p></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><StatTile value={count("screening")} label="Awaiting screening" /><StatTile value={count("decision")} label="Awaiting confirmation" /><StatTile value={count("poc")} label="In proof of concept" /><StatTile value={count("implementation")} label="In implementation" /></div><p className="text-sm text-muted">Updated {dateLabel(data.generatedAt)}. Open a workspace section to review its records.</p><OperationsAnalytics data={data} /><AdminEvidenceExports authorized={role ? hasCapability(role, CAPABILITIES.AUDIT_EXPORT) : false} /></div>;
+  return <div className="stack"><div><h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1><p className="mt-2 text-muted">A live summary of idea review and delivery progress.</p></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><StatTile value={count("screening")} label="Awaiting maintainer review" /><StatTile value={count("decision")} label="Awaiting confirmation" /><StatTile value={count("poc")} label="In proof of concept" /><StatTile value={count("implementation")} label="In implementation" /></div><p className="text-sm text-muted">Updated {dateLabel(data.generatedAt)}. Open a workspace section to review its records.</p><OperationsAnalytics data={data} /><AdminEvidenceExports authorized={role ? hasCapability(role, CAPABILITIES.AUDIT_EXPORT) : false} /></div>;
 }
 
-function GovernancePanel() {
+function GovernancePanel({ role }: { role?: UserRole }) {
   const [active, setActive] = useState("screening");
   return <div className="stack">
-    <SectionHeading title="Ideas" detail="Live governance queues and decisions" />
+    <SectionHeading title="Ideas" detail={role === "maintainer" ? "Review new submissions, follow owner matching and monitor delivery progress." : "Review submissions and monitor the full idea lifecycle."} />
     <SectionTabs items={governanceItems} active={active} onChange={setActive} />
-    {active === "screening" ? <AdminQueueTable kind="screening" title="Screening" detail="Accept an idea directly into proof of concept, route it to a business owner, return it, reject it or defer it." empty="No ideas are waiting for screening." />
-      : active === "transformation" ? <AdminQueueTable kind="transformation" title="Transformation" detail="Owner-approved ideas appear here for final confirmation. Open an idea and choose Confirm and accept to start its proof of concept." empty="No ideas are waiting for confirmation." />
+    {active === "screening" ? <AdminQueueTable kind="screening" title="Maintainer review" detail="Accept to begin AI-assisted owner matching, reject, or send the idea back to its author." empty="No ideas are waiting for maintainer review." />
+      : active === "progress" ? <AdminProgress />
       : null}
   </div>;
 }
 
 function PeoplePanel({ currentUserId }: { currentUserId?: number }) {
-  const roles: UserRole[] = ["employee", "back_office", "business_owner"];
+  const roles: UserRole[] = ["employee", "admin", "maintainer", "business_owner"];
   return (
     <div className="stack">
       <SectionHeading title="Users" detail="Accounts, roles and session activity" />
       <AdminPeopleManagement currentUserId={currentUserId} />
       <details className="rounded-xl border border-[var(--line)] bg-white p-5">
         <summary className="cursor-pointer font-medium">Role permissions</summary>
-        <p className="mt-2 text-sm text-muted">Assign one of the three roles in the user list above. Each role has these server-enforced capabilities.</p>
+        <p className="mt-2 text-sm text-muted">Assign one of the four roles in the user list above. Each role has server-enforced capabilities.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{roles.map(role => <div key={role} className="rounded-xl border border-[var(--line)] p-4"><h3 className="font-medium capitalize">{role.replaceAll("_", " ")}</h3><ul className="mt-2 space-y-1 text-xs text-muted">{capabilitiesForRole(role).map(capability => <li key={capability}>{capability}</li>)}</ul></div>)}</div>
       </details>
     </div>
@@ -332,7 +333,7 @@ export function AdminWorkspace({ email }: AdminWorkspaceProps) {
   const { data: session, status } = useSession();
   const [requestedView, setRequestedView] = useState<AdminView>("dashboard");
   if (status === "loading") return <BrandLoading />;
-  if (!session?.user) return <main className="min-h-screen bg-[#f8faff] p-6" role="alert">Your session has ended. Sign in to open the back office.</main>;
+  if (!session?.user) return <main className="min-h-screen bg-[#f8faff] p-6" role="alert">Your session has ended. Sign in to open your workspace.</main>;
   const role = session.user.role;
   const views = visibleAdminViews(role);
   const active = views.includes(requestedView) ? requestedView : views[0] ?? "dashboard";
@@ -340,7 +341,7 @@ export function AdminWorkspace({ email }: AdminWorkspaceProps) {
   let content;
   switch (active) {
     case "dashboard": content = <DashboardPanel role={role} />; break;
-    case "ideas": content = role === "business_owner" ? <AdminEvaluation /> : <GovernancePanel />; break;
+    case "ideas": content = role === "business_owner" ? <AdminEvaluation /> : role === "admin" || role === "maintainer" ? <GovernancePanel role={role} /> : null; break;
     case "delivery": content = <AdminDelivery />; break;
     case "feedback": content = <EngagementPanel />; break;
     case "learning": content = <LearningPanel />; break;
@@ -349,8 +350,8 @@ export function AdminWorkspace({ email }: AdminWorkspaceProps) {
     case "rewards": content = <RewardsPanel />; break;
     case "users": content = <PeoplePanel currentUserId={currentUserId} />; break;
     case "settings": content = <SettingsPanel />; break;
-    case "ai-prompts": content = role === "back_office" ? <AdminAiPrompts /> : null; break;
-    case "ai-activity": content = role === "back_office" ? <AdminAiActivity /> : null; break;
+    case "ai-prompts": content = role === "admin" ? <AdminAiPrompts /> : null; break;
+    case "ai-activity": content = role === "admin" ? <AdminAiActivity /> : null; break;
     case "audit": content = <AuditPanel role={role} />; break;
   }
   return <AdminShell email={email} name={session.user.name} role={role} views={views} active={active} onNavigate={setRequestedView}>{content}</AdminShell>;

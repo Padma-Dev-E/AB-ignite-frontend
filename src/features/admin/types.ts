@@ -44,7 +44,8 @@ export type AdminUser = {
   id: number;
   name: string;
   email: string;
-  role: "employee" | "back_office" | "business_owner";
+  role: "employee" | "admin" | "maintainer" | "business_owner";
+  businessProfile: string | null;
   department: string;
   jobTitle: string | null;
   isActive: boolean;
@@ -67,7 +68,8 @@ export type AdminAuditEvent = {
   metadata: Record<string, unknown>;
   ipHash?: string | null;
 };
-export type AdminIdea = { id: number; reference: string; title: string; summary: string; category: string; status: string; priorityBand: string | null; priorityScore: number | null; aiValidationScore?: number | null; aiValidationAttempts?: number; submittedWithLowAiScore?: boolean; authorId: number; authorName: string; department: string; createdAt: string; updatedAt: string };
+export type AdminIdea = { id: number; reference: string; title: string; summary: string; category: string; status: string; priorityBand: string | null; priorityScore: number | null; aiValidationScore?: number | null; aiValidationAttempts?: number; submittedWithLowAiScore?: boolean; assignedUserId?: number | null; assignedOwnerName?: string | null; authorId: number; authorName: string; department: string; createdAt: string; updatedAt: string };
+export type BusinessOwnerOption = { id: number; name: string; department: string; businessProfile: string | null };
 export type AdminSettings = { priority: Record<string, string>; pointRules: Array<{ id: number; code: string; name: string; points: number; active: boolean }>; recommendationRules: Array<{ id: number; topic: string; thresholdPercent: number; reasonTemplate: string; active: boolean }>; levels: Array<{ id: number; name: string; description: string | null; minimumPoints: number; sortOrder: number }>; departments: string[] };
 
 export type AdminEvaluationDetail = {
@@ -87,6 +89,7 @@ export type AdminEvaluationDetail = {
   } | null;
   assessment: { jobKey: string; completedAt: string | null; result: unknown } | null;
   route: (Record<string, unknown> & { createdAt: string }) | null;
+  ownerMatch: ({ eventType: string; createdAt: string; source?: string; confidence?: number; rationale?: string; reasonCode?: string; businessOwnerId?: number } & Record<string, unknown>) | null;
   controlReview: { required: string[]; approved: string[]; pending: string[] } | null;
 };
 

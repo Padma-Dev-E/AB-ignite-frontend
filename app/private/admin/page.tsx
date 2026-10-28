@@ -5,7 +5,7 @@ import { AdminWorkspace } from "../../../src/features/admin/components/admin-wor
 export default async function AdminPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  if (session.user.role === "employee") redirect("/private");
+  if (!["admin", "maintainer", "business_owner"].includes(session.user.role ?? "")) redirect("/private");
 
   return <AdminWorkspace email={session.user.email ?? "Administrator"} />;
 }

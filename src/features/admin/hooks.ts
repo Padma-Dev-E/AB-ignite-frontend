@@ -17,6 +17,8 @@ import {
   listAdminScreening,
   listAdminTransformation,
   listAdminBusinessOwners,
+  listAdminProgress,
+  assignAdminBusinessOwner,
   listAdminUsers,
   respondToAdminFeedback,
   updateAdminReward,
@@ -42,6 +44,8 @@ export function useAdminGovernanceDecision() {
       Promise.all([
         client.invalidateQueries({ queryKey: adminQueryKeys.screening }),
         client.invalidateQueries({ queryKey: adminQueryKeys.transformation }),
+        client.invalidateQueries({ queryKey: adminQueryKeys.progress }),
+        client.invalidateQueries({ queryKey: adminQueryKeys.evaluations }),
       ]),
   });
 }
@@ -128,6 +132,29 @@ export function useAdminTransformationPages(enabled = true) {
     initialPageParam: null as number | null,
     getNextPageParam: (page) => page.nextAfter ?? undefined,
     enabled,
+  });
+}
+export function useAdminProgressPages(enabled = true) {
+  return useInfiniteQuery({
+    queryKey: [...adminQueryKeys.progress, "pages", 10] as const,
+    queryFn: ({ pageParam }) => listAdminProgress(10, pageParam),
+    initialPageParam: null as number | null,
+    getNextPageParam: page => page.nextAfter ?? undefined,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
+    enabled,
+  });
+}
+export function useAssignAdminBusinessOwner() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ideaId, businessOwnerId }: { ideaId: number; businessOwnerId: number }) => assignAdminBusinessOwner(ideaId, businessOwnerId),
+    onSuccess: async () => Promise.all([
+      client.invalidateQueries({ queryKey: adminQueryKeys.progress }),
+      client.invalidateQueries({ queryKey: adminQueryKeys.screening }),
+      client.invalidateQueries({ queryKey: adminQueryKeys.transformation }),
+      client.invalidateQueries({ queryKey: adminQueryKeys.evaluations }),
+    ]),
   });
 }
 export function useAdminBusinessOwnerPages(enabled = true) {

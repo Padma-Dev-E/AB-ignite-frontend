@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LoginScreen } from "../../src/components/auth/login-screen";
 import { withBasePath } from "../../src/lib/routing/base-path";
 import { loginFailureMessage } from "../../src/auth/backend-status-client";
+import { postLoginPath } from "../../src/auth/config";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export default function LoginPage() {
       router.refresh();
       return;
     }
-    if (session?.user?.role) router.replace(session.user.role === "employee" ? "/private" : "/private/admin");
+    if (session?.user?.role) router.replace(postLoginPath(session.user.role));
     router.refresh();
   }
 

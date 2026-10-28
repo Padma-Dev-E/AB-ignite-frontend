@@ -12,6 +12,7 @@ import type {
   AdminReward,
   AdminSettings,
   AdminUser,
+  BusinessOwnerOption,
   Paginated,
 } from "./types";
 
@@ -122,9 +123,21 @@ export function listAdminDelivery(after: number | null = null) {
 export function listAdminBusinessOwners(limit = 100, after: number | null = null) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (after !== null) params.set("after", String(after));
-  return apiFetch<{ items: Array<{ id: number; name: string; department: string }>; nextAfter: number | null }>(
+  return apiFetch<{ items: BusinessOwnerOption[]; nextAfter: number | null }>(
     `/api/admin/governance/owners?${params}`,
   );
+}
+export function listAdminProgress(limit = 10, after: number | null = null) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (after !== null) params.set("after", String(after));
+  return apiFetch<{ items: AdminIdea[]; nextAfter: number | null }>(`/api/admin/governance/queues/progress?${params}`);
+}
+export function assignAdminBusinessOwner(ideaId: number, businessOwnerId: number) {
+  return apiFetch(`/api/admin/governance/ideas/${ideaId}/owner-assignment`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
+    body: JSON.stringify({ businessOwnerId }),
+  });
 }
 export function getAdminSettings() {
   return apiFetch<AdminSettings>("/api/admin/settings");
@@ -154,7 +167,6 @@ export function respondToAdminFeedback(id: number, response: string) {
 }
 
 export type GovernanceAction =
-  | "route"
   | "return"
   | "reject"
   | "defer"
@@ -177,7 +189,7 @@ export function decideAdminIdea(
     body: JSON.stringify({ action, reason, businessOwnerId, controlName }),
   });
 }
-export type EvaluationAction = "approve" | "return" | "not_recommended";
+export type EvaluationAction = GovernanceAction;
 export function decideAdminEvaluation(
   ideaId: number,
   action: EvaluationAction,
@@ -198,6 +210,8 @@ export const adminQueryKeys = {
   screening: ["admin", "governance", "screening"] as const,
   transformation: ["admin", "governance", "transformation"] as const,
   delivery: ["admin", "governance", "delivery"] as const,
+  progress: ["admin", "governance", "progress"] as const,
+  owners: ["admin", "governance", "owners"] as const,
   settings: ["admin", "settings"] as const,
   evaluations: ["admin", "governance", "evaluations"] as const,
   evaluation: (ideaId: number) =>

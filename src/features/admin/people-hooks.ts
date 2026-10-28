@@ -6,7 +6,7 @@ import { createPerson, listPeople, listPersonSessions, peopleQueryKeys, resetPer
 export function usePeopleUsers(search = "") {
   return useInfiniteQuery({ queryKey: peopleQueryKeys.search(search), queryFn: ({ pageParam }) => listPeople(pageParam, search), initialPageParam: null as number | null, getNextPageParam: (lastPage) => lastPage.nextAfter ?? undefined });
 }
-export function useCreatePerson() { return usePeopleMutation((input: { name: string; email: string; department: string; jobTitle?: string; role: AdminRole }) => createPerson(input)); }
+export function useCreatePerson() { return usePeopleMutation((input: { name: string; email: string; department: string; jobTitle?: string; businessProfile?: string; role: AdminRole }) => createPerson(input)); }
 
 export function usePersonSessions(userId: number | null) {
   return useQuery({ queryKey: userId === null ? [...peopleQueryKeys.users, "no-user"] : peopleQueryKeys.sessions(userId), queryFn: () => listPersonSessions(userId!), enabled: userId !== null });

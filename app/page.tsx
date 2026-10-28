@@ -242,7 +242,7 @@ function SideNav({
   onClose: () => void;
   onNavigate: (page: Page) => void;
   onSignOut: () => void;
-  adminPortalRole: "back_office" | "business_owner" | null;
+  adminPortalRole: "admin" | "maintainer" | "business_owner" | null;
   displayName?: string;
   department?: string;
 }) {
@@ -284,7 +284,7 @@ function SideNav({
         <br />
         {department || "Employee"}
         <br />
-        {adminPortalRole && <Link href="/private/admin" className="mt-2 inline-block font-medium text-blue">Return to your {adminPortalRole === "business_owner" ? "business-owner" : "back-office"} portal</Link>}
+        {adminPortalRole && <Link href="/private/admin" className="mt-2 inline-block font-medium text-blue">Return to your {adminPortalRole === "business_owner" ? "business-owner" : adminPortalRole === "maintainer" ? "maintainer" : "admin"} portal</Link>}
         <button onClick={onSignOut} className="mt-2 block text-blue">
           Sign out
         </button>
@@ -2118,7 +2118,7 @@ function isProtectedViewProps(
 export default function Home(props: unknown) {
   const protectedView = isProtectedViewProps(props);
   const [signedIn, setSignedIn] = useState(protectedView);
-  const [adminPortalRole, setAdminPortalRole] = useState<"back_office" | "business_owner" | null>(null);
+  const [adminPortalRole, setAdminPortalRole] = useState<"admin" | "maintainer" | "business_owner" | null>(null);
   const [page, setPage] = useState<Page>("community");
   const [selectedIdeaId, setSelectedIdeaId] = useState<number | null>(null);
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState<number | null>(null);
@@ -2161,7 +2161,7 @@ export default function Home(props: unknown) {
     if (!protectedView) return;
     void getSession().then((session) => {
       const role = session?.user?.role;
-      setAdminPortalRole(role === "back_office" || role === "business_owner" ? role : null);
+      setAdminPortalRole(role === "admin" || role === "maintainer" || role === "business_owner" ? role : null);
     }).catch(() => setAdminPortalRole(null));
   }, [protectedView]);
   useEffect(() => {

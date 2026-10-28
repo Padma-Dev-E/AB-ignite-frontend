@@ -173,7 +173,7 @@ export function AiTestPage() {
             <button type="submit" disabled={busy || !url.trim() || !method.trim()} className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#1762a7] px-5 text-sm font-semibold text-white transition hover:bg-[#104f8a] disabled:cursor-not-allowed disabled:opacity-55">
               {busy ? "Sending from Fastify…" : "Send request"}
             </button>
-            <p className="mt-3 text-xs leading-5 text-[#718197]">Enter valid JSON. Fastify sends it as JSON and adds Content-Type: application/json when you have not supplied that header. Sending requires a back-office session.</p>
+            <p className="mt-3 text-xs leading-5 text-[#718197]">Enter valid JSON. Fastify sends it as JSON and adds Content-Type: application/json when you have not supplied that header. Sending requires an admin session.</p>
           </section>
 
           <section className="min-h-[520px] rounded-2xl border border-[#dce4ed] bg-white p-5 shadow-[0_10px_30px_rgba(27,55,88,0.06)] sm:p-6" aria-live="polite">

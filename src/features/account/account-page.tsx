@@ -30,7 +30,7 @@ function badgeEmoji(name: string, emoji: unknown) {
 function State({ query }: { query: { isPending: boolean; isError: boolean; refetch: () => unknown } }) {
   return query.isPending ? <p role="status" className="py-6 text-muted">Loading…</p> : query.isError ? <div role="alert" className="py-4"><p>Unable to load this section.</p><Button className="mt-2" onClick={() => void query.refetch()}>Try again</Button></div> : null;
 }
-export function AccountOverview({ onNavigate, adminPortalRole = null }: { onNavigate: (page: Page) => void; adminPortalRole?: 'back_office' | 'business_owner' | null }) {
+export function AccountOverview({ onNavigate, adminPortalRole = null }: { onNavigate: (page: Page) => void; adminPortalRole?: 'admin' | 'maintainer' | 'business_owner' | null }) {
   const [selectedIdea, setSelectedIdea] = useState<number | null>(null);
   const profile = useEmployeeProfile();
   const rewards = usePointsSummary();

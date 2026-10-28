@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { addIdeaComment, createIdea, deleteIdeaDraft, getIdea, getIdeaAiStatus, getIdeaDevelopment, getIdeaPriorityPolicy, ideaQueryKeys, listIdeaComments, listIdeas, queueIdeaDevelopment, saveIdeaSubmission, submitIdea, supportIdea, updateIdea, updateIdeaDraft } from "./api";
+import { addIdeaComment, createIdea, deleteIdeaDraft, getIdea, getIdeaDevelopment, getIdeaPriorityPolicy, getIdeaSubmissionReadiness, ideaQueryKeys, listIdeaComments, listIdeas, queueIdeaDevelopment, saveIdeaSubmission, submitIdea, supportIdea, updateIdea, updateIdeaDraft } from "./api";
 import type { IdeaCreateInput, IdeaListParams, IdeaSubmissionInput, IdeaUpdateInput } from "./types";
 
 export function useIdeas(params: IdeaListParams = {}, enabled = true) { return useQuery({ queryKey: ideaQueryKeys.list(params), queryFn: () => listIdeas(params), enabled }); }
@@ -28,17 +28,17 @@ export function useDeleteIdeaDraft() {
     void client.invalidateQueries({ queryKey: ideaQueryKeys.all });
     client.removeQueries({ queryKey: ideaQueryKeys.detail(id) });
     client.removeQueries({ queryKey: ["ideas", "development", id] });
-    client.removeQueries({ queryKey: ["ideas", "ai-status", id] });
+    client.removeQueries({ queryKey: ["ideas", "submission-readiness", id] });
   } });
 }
-export function useIdeaAiStatus(id: number, enabled = true) { return useQuery({ queryKey: ["ideas", "ai-status", id] as const, queryFn: () => getIdeaAiStatus(id), enabled: enabled && id > 0, refetchInterval: (query) => { const runs = query.state.data?.runs ?? []; return runs.some((run) => run.status === "queued" || run.status === "running") ? 2000 : false; } }); }
+export function useIdeaSubmissionReadiness(id: number, enabled = true) { return useQuery({ queryKey: ["ideas", "submission-readiness", id] as const, queryFn: () => getIdeaSubmissionReadiness(id), enabled: enabled && id > 0, refetchInterval: (query) => { const readiness = query.state.data; return readiness?.canFinalize || readiness?.needsAttention ? false : 2000; } }); }
 export function useIdeaDevelopment(id: number, enabled = true, activeRunId?: number | null) { return useQuery({ queryKey: ["ideas", "development", id] as const, queryFn: () => getIdeaDevelopment(id), enabled: enabled && id > 0, refetchInterval: (query) => {
   const runs = query.state.data?.runs ?? [];
   if (activeRunId != null) {
     const activeRun = runs.find((run) => run.id === activeRunId);
-    if (!activeRun || activeRun.status === "queued" || activeRun.status === "running") return 2000;
+    if (!activeRun || activeRun.pending) return 2000;
   }
-  return runs.some((run) => run.status === "queued" || run.status === "running") ? 2000 : false;
+  return runs.some((run) => run.pending) ? 2000 : false;
 } }); }
 export function useUpdateIdeaDraft() { const client = useQueryClient(); return useMutation({ mutationFn: ({ id, input }: { id: number; input: IdeaUpdateInput }) => updateIdeaDraft(id, input), onSuccess: (_data, variables) => { void client.invalidateQueries({ queryKey: ["ideas", "development", variables.id] }); } }); }
 export function useQueueIdeaDevelopment() { const client = useQueryClient(); return useMutation({ mutationFn: ({ id, action, context }: { id: number; action: "enrich" | "questions" | "validate"; context?: { answers?: Record<string, string>; differentiation?: string } }) => queueIdeaDevelopment(id, action, context), onSuccess: (_data, variables) => { void client.invalidateQueries({ queryKey: ["ideas", "development", variables.id] }); } }); }
