@@ -30,7 +30,13 @@ function badgeEmoji(name: string, emoji: unknown) {
 function State({ query }: { query: { isPending: boolean; isError: boolean; refetch: () => unknown } }) {
   return query.isPending ? <p role="status" className="py-6 text-muted">Loading…</p> : query.isError ? <div role="alert" className="py-4"><p>Unable to load this section.</p><Button className="mt-2" onClick={() => void query.refetch()}>Try again</Button></div> : null;
 }
-export function AccountOverview({ onNavigate, adminPortalRole = null }: { onNavigate: (page: Page) => void; adminPortalRole?: 'admin' | 'maintainer' | 'business_owner' | null }) {
+type AccountOverviewProps = {
+  onNavigate: (page: Page) => void;
+  onResumeDraft?: (id: number) => void;
+  adminPortalRole?: 'admin' | 'maintainer' | 'business_owner' | null;
+};
+
+export function AccountOverview({ onNavigate, onResumeDraft, adminPortalRole = null }: AccountOverviewProps) {
   const [selectedIdea, setSelectedIdea] = useState<number | null>(null);
   const profile = useEmployeeProfile();
   const rewards = usePointsSummary();
@@ -61,7 +67,7 @@ export function AccountOverview({ onNavigate, adminPortalRole = null }: { onNavi
   async function leave() {
     await logoutToLogin();
   }
-  if (selectedIdea !== null) return <EmployeeIdeaDetailPage ideaId={selectedIdea} onBack={() => setSelectedIdea(null)} />;
+  if (selectedIdea !== null) return <EmployeeIdeaDetailPage ideaId={selectedIdea} onBack={() => setSelectedIdea(null)} onResumeDraft={onResumeDraft} />;
   return <div className="stack">
     <section className="relative min-h-[245px] overflow-hidden rounded-[24px] bg-gradient-to-r from-[#102d7b] to-[#205bff] px-7 py-7 text-white sm:px-8">
       <div aria-hidden="true" className="pointer-events-none absolute -right-14 top-[-42px] h-56 w-56 rounded-full bg-white/[0.08]" />

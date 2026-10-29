@@ -91,8 +91,23 @@ export type IdeaDevelopmentRun = { id: number; jobKey: "idea.enrich" | "idea.que
 export type IdeaSubmissionAnswers = Record<string, string>;
 export type IdeaSubmissionMetrics = { turnaround: number; volume: number; value: number; turnaroundExplanation?: string; volumeExplanation?: string; valueExplanation?: string };
 export type IdeaSubmissionInput = { answers: IdeaSubmissionAnswers; metrics: IdeaSubmissionMetrics; buildsOnId?: number; differentiation?: string };
+export type IdeaDraftProgress = {
+  step: number;
+  raw: string;
+  answers: IdeaSubmissionAnswers;
+  impact: { turnaround: string; volume: string; value: string };
+  metricExplanations: { turnaround: string; volume: string; value: string };
+  differentiation: string;
+  continueWithoutQuestions: boolean;
+  workingCopy: {
+    kind: IdeaKind;
+    title: string;
+    summary: string;
+    details: { problem: string; solution: string; benefits: string; risks: string };
+  };
+};
 export type IdeaComment = { id: number; ideaId: number; authorId: number; body: string; createdAt: string; updatedAt: string; author: { id: number; name: string; department: string } | null };
 export type CommentListResponse = { items: IdeaComment[]; page: number; pageSize: number; total: number; totalPages: number };
 export type IdeaUpdateInput = Partial<Pick<Idea, "kind" | "title" | "summary" | "problem" | "solution" | "benefits" | "risks" | "category">> & { dataClassification?: "public" | "internal" | "confidential" | "restricted" };
-export type IdeaDetailResponse = { idea: Idea; versionId?: number; pendingSubmission?: { submitForHumanReview: boolean }; comments: CommentListResponse; submission?: { answers: IdeaSubmissionAnswers; metrics: IdeaSubmissionMetrics; score: number; minimumScore: number; validationPassed: boolean; differentiation: string | null } | null };
+export type IdeaDetailResponse = { idea: Idea; versionId?: number; pendingSubmission?: { submitForHumanReview: boolean }; draftProgress?: IdeaDraftProgress; comments: CommentListResponse; submission?: { answers: IdeaSubmissionAnswers; metrics: IdeaSubmissionMetrics; score: number; minimumScore: number; validationPassed: boolean; differentiation: string | null } | null };
 export type SupportResponse = { supported: boolean; supports: number };

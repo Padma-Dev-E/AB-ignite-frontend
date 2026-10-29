@@ -1,5 +1,5 @@
 import { apiFetch } from "../../lib/api/client";
-import type { CommentListResponse, Idea, IdeaComment, IdeaCreateInput, IdeaCreateResponse, IdeaDetailResponse, IdeaDevelopmentRun, IdeaListParams, IdeaListResponse, IdeaPriorityPolicy, IdeaSubmissionInput, IdeaSubmissionReadiness, IdeaSubmitResponse, IdeaUpdateInput, SupportResponse } from "./types";
+import type { CommentListResponse, Idea, IdeaComment, IdeaCreateInput, IdeaCreateResponse, IdeaDetailResponse, IdeaDevelopmentRun, IdeaDraftProgress, IdeaListParams, IdeaListResponse, IdeaPriorityPolicy, IdeaSubmissionInput, IdeaSubmissionReadiness, IdeaSubmitResponse, IdeaUpdateInput, SupportResponse } from "./types";
 
 function queryString(params: Record<string, string | number | boolean | undefined>) {
   const query = new URLSearchParams();
@@ -14,6 +14,7 @@ export function createIdea(input: IdeaCreateInput) { return apiFetch<IdeaCreateR
 export function submitIdea(id: number, versionId?: number, submitForHumanReview = false) { return apiFetch<IdeaSubmitResponse>(`/api/ideas/${id}/submit`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ versionId, idempotencyKey: `idea:${id}:submit:${versionId ?? "latest"}`, ...(submitForHumanReview ? { submitForHumanReview: true } : {}) }) }); }
 export function saveIdeaSubmission(id: number, input: IdeaSubmissionInput) { return apiFetch<{ score: number; minimumScore: number; answers: IdeaSubmissionInput["answers"]; metrics: IdeaSubmissionInput["metrics"] }>(`/api/ideas/${id}/submission`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }); }
 export function getIdea(id: number, params: { page?: number; pageSize?: number } = {}) { return apiFetch<IdeaDetailResponse>(`/api/ideas/${id}${queryString(params)}`); }
+export function saveIdeaDraftProgress(id: number, progress: IdeaDraftProgress) { return apiFetch<{ saved: boolean }>(`/api/ideas/${id}/draft-progress`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(progress) }); }
 export function deleteIdeaDraft(id: number) { return apiFetch<{ id: number; deleted: true }>(`/api/ideas/${id}`, { method: "DELETE" }); }
 export function getIdeaSubmissionReadiness(id: number) { return apiFetch<IdeaSubmissionReadiness>(`/api/ideas/${id}/submission-readiness`); }
 export function getIdeaDevelopment(id: number) { return apiFetch<{ runs: IdeaDevelopmentRun[] }>(`/api/ideas/${id}/development`); }

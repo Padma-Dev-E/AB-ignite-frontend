@@ -102,7 +102,7 @@ export function QuizResult({ result, topics = [], answerReview = [], quizTitle, 
   </div>;
 }
 
-export function QuizJourney({ relatedQuizId, onFullscreenChange, onOpenJourney, onReadArticle }: { relatedQuizId?: number | null; onFullscreenChange?: (fullscreen: boolean) => void; onOpenJourney?: () => void; onReadArticle?: (articleId: number) => void }) {
+export function QuizJourney({ relatedQuizId, reviewAttemptId = null, onReportClosed, onFullscreenChange, onOpenJourney, onReadArticle }: { relatedQuizId?: number | null; reviewAttemptId?: number | null; onReportClosed?: () => void; onFullscreenChange?: (fullscreen: boolean) => void; onOpenJourney?: () => void; onReadArticle?: (articleId: number) => void }) {
   const catalogue = useQuizzes();
   const journey = useLearningJourney();
   const start = useStartQuizAttempt();
@@ -128,6 +128,15 @@ export function QuizJourney({ relatedQuizId, onFullscreenChange, onOpenJourney, 
   useEffect(() => { setSelectedQuizId(relatedQuizId ?? null); }, [relatedQuizId]);
 
   useEffect(() => {
+    if (reviewAttemptId != null) {
+      restoredDraft.current = null;
+      setSelectedQuizId(null);
+      setAttemptId(reviewAttemptId);
+      setAnswers({});
+      setQuestionIndex(0);
+      setResumeReady(true);
+      return;
+    }
     if (relatedQuizId != null) { restoredDraft.current = null; setAttemptId(null); setResumeReady(true); return; }
     try {
       const draft = parseQuizResume(window.sessionStorage.getItem(resumeStorageKey));
@@ -135,11 +144,11 @@ export function QuizJourney({ relatedQuizId, onFullscreenChange, onOpenJourney, 
       if (draft) setAttemptId(draft.attemptId);
       else setResumeReady(true);
     } catch { setResumeReady(true); }
-  }, [relatedQuizId]);
+  }, [relatedQuizId, reviewAttemptId]);
   useEffect(() => {
-    if (attemptId === null || !resumeReady) return;
+    if (attemptId === null || !resumeReady || reviewAttemptId !== null) return;
     try { window.sessionStorage.setItem(resumeStorageKey, serializeQuizResume({ attemptId, questionIndex, answers })); } catch { /* Session storage can be unavailable. */ }
-  }, [attemptId, resumeReady, questionIndex, answers]);
+  }, [attemptId, resumeReady, questionIndex, answers, reviewAttemptId]);
   useEffect(() => {
     const updateConnection = () => setOnline(window.navigator.onLine);
     updateConnection();
@@ -180,7 +189,7 @@ export function QuizJourney({ relatedQuizId, onFullscreenChange, onOpenJourney, 
       restoredDraft.current = null; setAnswers({}); setQuestionIndex(0); setNow(Date.now()); timeoutSubmittedFor.current = null; setAttemptId(started.id); setResumeReady(true);
     } });
   };
-  const leaveResult = () => { try { window.sessionStorage.removeItem(resumeStorageKey); } catch { /* Session storage can be unavailable. */ } restoredDraft.current = null; setAttemptId(null); setSelectedQuizId(null); setResumeReady(true); setAnswers({}); setQuestionIndex(0); timeoutSubmittedFor.current = null; submit.reset(); start.reset(); void catalogue.refetch(); };
+  const leaveResult = () => { if (reviewAttemptId === null) { try { window.sessionStorage.removeItem(resumeStorageKey); } catch { /* Session storage can be unavailable. */ } } onReportClosed?.(); restoredDraft.current = null; setAttemptId(null); setSelectedQuizId(null); setResumeReady(true); setAnswers({}); setQuestionIndex(0); timeoutSubmittedFor.current = null; submit.reset(); start.reset(); void catalogue.refetch(); };
 
   if (attemptId !== null) {
     if (attemptQuery.isError) return <div className="space-y-3"><LearningState state="error" label={errorText(attemptQuery.error, "Your attempt could not be loaded.")} onRetry={() => void attemptQuery.refetch()} /><button className={action} type="button" onClick={leaveResult}>Back to all quizzes</button></div>;

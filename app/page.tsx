@@ -1679,8 +1679,8 @@ function ArticlePage({ onBack }: { onBack: () => void }) {
   );
 }
 
-function AccountPage({ onNavigate }: { onNavigate: (page: Page) => void }) {
-  return <AccountOverview onNavigate={onNavigate} />;
+function AccountPage({ onNavigate, onResumeDraft }: { onNavigate: (page: Page) => void; onResumeDraft: (ideaId: number) => void }) {
+  return <AccountOverview onNavigate={onNavigate} onResumeDraft={onResumeDraft} />;
 }
 
 function LegacyAccountPage({
@@ -1773,6 +1773,7 @@ function LiveLearnPage({ onArticle, relatedQuizId = null, onShareIdea }: { onArt
   const [tab, setTab] = useState(relatedQuizId ? "Quizzes" : "My journey");
   const [quizFullscreen, setQuizFullscreen] = useState(false);
   const [selectedRelatedQuizId, setSelectedRelatedQuizId] = useState<number | null>(relatedQuizId);
+  const [reviewAttemptId, setReviewAttemptId] = useState<number | null>(null);
   const [pendingQuizArticleId, setPendingQuizArticleId] = useState<number | undefined>();
   const [articleErrors, setArticleErrors] = useState<Record<number, string>>({});
   const journey = useLearningJourney();
@@ -1833,6 +1834,7 @@ function LiveLearnPage({ onArticle, relatedQuizId = null, onShareIdea }: { onArt
             <JourneyCard
               journey={journey.data}
               onReadArticle={onArticle}
+              onViewQuizReport={(attemptId) => { setReviewAttemptId(attemptId); setSelectedRelatedQuizId(null); setTab("Quizzes"); }}
               onCompleteArticle={(articleId) => void markArticleCompleted(articleId)}
               onRetakeRelatedQuiz={(articleId, quizId) => void openRelatedQuiz(articleId, quizId)}
               pendingArticleId={completeArticle.isPending ? completeArticle.variables?.articleId : undefined}
@@ -1861,7 +1863,7 @@ function LiveLearnPage({ onArticle, relatedQuizId = null, onShareIdea }: { onArt
           </button>
         </>
       )}
-      {tab === "Quizzes" && <QuizJourney relatedQuizId={selectedRelatedQuizId} onFullscreenChange={setQuizFullscreen} onOpenJourney={() => setTab("My journey")} onReadArticle={onArticle} />}
+      {tab === "Quizzes" && <QuizJourney relatedQuizId={selectedRelatedQuizId} reviewAttemptId={reviewAttemptId} onReportClosed={() => setReviewAttemptId(null)} onFullscreenChange={setQuizFullscreen} onOpenJourney={() => setTab("My journey")} onReadArticle={onArticle} />}
       {tab === "Ranking" && <LearningRanking />}
       {tab === "Challenges" && <LearningChallenges onShareIdea={onShareIdea} />}
     </div>
@@ -2124,6 +2126,7 @@ export default function Home(props: unknown) {
   const [signedIn, setSignedIn] = useState(protectedView);
   const [adminPortalRole, setAdminPortalRole] = useState<"admin" | "maintainer" | "business_owner" | null>(null);
   const [page, setPage] = useState<Page>("community");
+  const [resumeDraftId, setResumeDraftId] = useState<number | null>(null);
   const [selectedIdeaId, setSelectedIdeaId] = useState<number | null>(null);
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState<number | null>(null);
   const [selectedRecommendationTopic, setSelectedRecommendationTopic] = useState<string | null>(null);
@@ -2200,6 +2203,7 @@ export default function Home(props: unknown) {
   const signOut = async () => logoutToLogin();
   const navigate = (next: Page, preserveNotificationUrl = false) => {
     if (!preserveNotificationUrl && window.location.search) window.history.pushState({}, "", window.location.pathname);
+    if (next !== "new") setResumeDraftId(null);
     setPage(next);
     setMenuOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2248,7 +2252,7 @@ export default function Home(props: unknown) {
         onOpenArticle={(id) => { setSelectedArticleId(id); navigate("article"); }}
       />
     ) : page === "new" ? (
-      <EmployeeIdeaSubmissionPage onOpenIdea={openIdea} />
+      <EmployeeIdeaSubmissionPage onOpenIdea={openIdea} initialDraftId={resumeDraftId} />
     ) : page === "learn" ? (
       <LiveLearnPage key="learn" onArticle={(id) => { setSelectedArticleId(id); navigate("article"); }} onShareIdea={() => navigate("new")} />
     ) : page === "library" ? (
@@ -2278,7 +2282,7 @@ export default function Home(props: unknown) {
     ) : page === "rewards" ? (
       <LiveRewardsPage />
     ) : page === "me" ? (
-      <AccountPage onNavigate={navigate} />
+      <AccountPage onNavigate={navigate} onResumeDraft={(ideaId) => { setResumeDraftId(ideaId); navigate("new"); }} />
     ) : page === "quiz" ? (
       <LiveLearnPage key={`related-quiz-${selectedRelatedQuizId ?? "all"}`} relatedQuizId={selectedRelatedQuizId} onArticle={(id) => { setSelectedArticleId(id); navigate("article"); }} onShareIdea={() => navigate("new")} />
     ) : (

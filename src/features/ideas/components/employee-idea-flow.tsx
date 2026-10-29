@@ -10,19 +10,17 @@ import { ideaValidationPasses, normalizeIdeaValidationScore } from "../../../lib
 import type { AppDispatch, RootState } from "../../../store";
 import { resetIdeaWizard, setIdeaWizardStep } from "../../../store/ui-slice";
 import {
-  useAddIdeaComment,
   useCreateIdea,
   useDeleteIdeaDraft,
   useIdea,
-  useIdeaComments,
   useIdeaDevelopment,
   useIdeaPriorityPolicy,
   useIdeaSubmissionReadiness,
   useIdeas,
   useQueueIdeaDevelopment,
   useSaveIdeaSubmission,
+  useSaveIdeaDraftProgress,
   useSubmitIdea,
-  useSupportIdea,
   useUpdateIdea,
   useUpdateIdeaDraft,
 } from "../hooks";
@@ -34,6 +32,7 @@ import { CommunityFeedRow } from "../../employee/community-feed";
 import type {
   Idea,
   IdeaCreateInput,
+  IdeaDraftProgress,
   IdeaClarifyingQuestion,
   IdeaEnrichment,
   IdeaKind,
@@ -302,14 +301,6 @@ function IdeaCard({ idea, onOpen }: { idea: Idea; onOpen: () => void }) {
           {idea.reference}
         </span>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button className="btn btn-small" onClick={onOpen}>
-          <Icon name="up" className="h-4 w-4" /> {idea.supports} Support
-        </button>
-        <button onClick={onOpen} className="btn btn-small">
-          <Icon name="msg" className="h-4 w-4" /> {idea.comments} Discuss
-        </button>
-      </div>
     </article>
   );
 }
@@ -359,9 +350,9 @@ export function EmployeeCommunityPage({
       page: 1,
       pageSize: 20,
       search: query || undefined,
-      mine: filter === "Mine",
+      mine: true,
     }),
-    [filter, query],
+    [query],
   );
   const ideasQuery = useIdeas(params);
   const items = useMemo(
@@ -369,7 +360,6 @@ export function EmployeeCommunityPage({
       (ideasQuery.data?.items ?? []).filter(
         (idea) =>
           filter === "Everything" ||
-          filter === "Mine" ||
           (filter === "Ideas" ? idea.kind === "idea" : idea.kind === "problem"),
       ),
     [filter, ideasQuery.data?.items],
@@ -444,13 +434,13 @@ export function EmployeeCommunityPage({
         </section>
         <section className="app-card" aria-label="What’s new"><h2 className="text-xl font-semibold">What’s new</h2><EmployeeCommunityUpdates onOpenAnnouncement={onOpenAnnouncement} /></section>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-semibold">Ideas from across the bank</h2><span className="text-sm text-muted">{ideasQuery.data ? `${ideasQuery.data.total} shared` : "Community ideas"}</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-semibold">Your ideas</h2><span className="text-sm text-muted">{ideasQuery.data ? `${ideasQuery.data.total} submitted` : "Your ideas"}</span></div>
       <div className="flex flex-wrap items-center gap-3">
         <div
           className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl border bg-white p-1"
           style={{ borderColor: "var(--line)" }}
         >
-          {["Everything", "Ideas", "Problems", "Mine"].map((item) => (
+          {["Everything", "Ideas", "Problems"].map((item) => (
             <button
               key={item}
               aria-pressed={filter === item}
@@ -479,8 +469,7 @@ export function EmployeeCommunityPage({
       </div>
       <p className="-mt-3 flex items-center gap-2 text-sm text-muted">
         <Icon name="lock" className="h-4 w-4" />
-        Every idea is registered to its author. You support colleagues’ ideas,
-        not your own.
+        Only you can see your submitted ideas here.
       </p>
       {ideasQuery.isPending ? (
         <StateMessage
@@ -608,14 +597,19 @@ function scoreBand(score: number) {
 
 export function EmployeeIdeaSubmissionPage({
   onOpenIdea,
+  initialDraftId = null,
 }: {
   onOpenIdea: (id: number) => void;
+  initialDraftId?: number | null;
 }) {
   const dispatch = useDispatch<AppDispatch>();
   const step = useSelector((state: RootState) => state.ui.ideaWizardStep);
   const [kind, setKind] = useState<IdeaKind>("idea");
   const [raw, setRaw] = useState("");
-  const [resumeDraftId, setResumeDraftId] = useState<number | null>(null);
+  const [resumeDraftId, setResumeDraftId] = useState<number | null>(initialDraftId);
+  const lastInitialDraftIdRef = useRef<number | null>(initialDraftId);
+  const resumeHadSubmissionRef = useRef(false);
+  const [resumeNeedsStepInference, setResumeNeedsStepInference] = useState(false);
   const [resumeDraftError, setResumeDraftError] = useState<string | null>(null);
   const [draftToDelete, setDraftToDelete] = useState<Idea | null>(null);
   const savedDraftsQuery = useIdeas({ page: 1, pageSize: 50, mine: true });
@@ -659,6 +653,7 @@ export function EmployeeIdeaSubmissionPage({
   const [developmentError, setDevelopmentError] = useState<string | null>(null);
   const [questionError, setQuestionError] = useState<string | null>(null);
   const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({});
+  const [draftProgressError, setDraftProgressError] = useState<string | null>(null);
   const [continueWithoutQuestions, setContinueWithoutQuestions] = useState(false);
   const [pendingQuestions, setPendingQuestions] = useState(false);
   const [questionVersionId, setQuestionVersionId] = useState<number | null>(null);
@@ -679,6 +674,9 @@ export function EmployeeIdeaSubmissionPage({
   const draftMutation = useUpdateIdeaDraft();
   const developmentMutation = useQueueIdeaDevelopment();
   const saveSubmissionMutation = useSaveIdeaSubmission();
+  const draftProgressMutation = useSaveIdeaDraftProgress();
+  const draftProgressQueueRef = useRef<{ id: number; progress: IdeaDraftProgress } | null>(null);
+  const draftProgressWorkerRef = useRef<Promise<void> | null>(null);
   const submitMutation = useSubmitIdea();
   const priorityPolicyQuery = useIdeaPriorityPolicy();
   const busy =
@@ -813,6 +811,13 @@ export function EmployeeIdeaSubmissionPage({
   }, [dispatch]);
 
   useEffect(() => {
+    if (initialDraftId === null || initialDraftId === lastInitialDraftIdRef.current) return;
+    lastInitialDraftIdRef.current = initialDraftId;
+    setResumeDraftError(null);
+    setResumeDraftId(initialDraftId);
+  }, [initialDraftId]);
+
+  useEffect(() => {
     const detail = resumeDraftQuery.data;
     if (!resumeDraftId || !detail || detail.idea.id !== resumeDraftId) return;
     if (typeof detail.versionId !== "number" || !Number.isSafeInteger(detail.versionId) || detail.versionId < 1) {
@@ -820,46 +825,56 @@ export function EmployeeIdeaSubmissionPage({
       setResumeDraftId(null);
       return;
     }
-    const { idea, submission } = detail;
-    setKind(idea.kind);
-    setRaw(idea.summary);
-    setTitle(idea.title);
-    setSummary(idea.summary);
-    setDetails({
+    const { idea, submission, draftProgress } = detail;
+    resumeHadSubmissionRef.current = Boolean(submission);
+    const workingCopy = draftProgress?.workingCopy;
+    const restoredKind = workingCopy?.kind ?? idea.kind;
+    const restoredRaw = draftProgress?.raw ?? idea.summary;
+    const restoredTitle = workingCopy?.title ?? idea.title;
+    const restoredSummary = workingCopy?.summary ?? idea.summary;
+    const restoredDetails = {
+      problem: workingCopy?.details.problem ?? idea.problem ?? "",
+      solution: workingCopy?.details.solution ?? idea.solution ?? "",
+      benefits: workingCopy?.details.benefits ?? idea.benefits ?? "",
+      risks: workingCopy?.details.risks ?? idea.risks ?? "",
+    };
+    setKind(restoredKind);
+    setRaw(restoredRaw);
+    setTitle(restoredTitle);
+    setSummary(restoredSummary);
+    setDetails(restoredDetails);
+    setBuildsOnId(idea.buildsOnId ?? undefined);
+    setQuestionAnswers(draftProgress?.answers ?? submission?.answers ?? {});
+    setImpact(draftProgress?.impact ?? {
+      turnaround: submission ? String(submission.metrics.turnaround) : "",
+      volume: submission ? String(submission.metrics.volume) : "",
+      value: submission ? String(submission.metrics.value) : "",
+    });
+    setMetricExplanations(draftProgress?.metricExplanations ?? {
+      turnaround: submission?.metrics.turnaroundExplanation ?? "",
+      volume: submission?.metrics.volumeExplanation ?? "",
+      value: submission?.metrics.valueExplanation ?? "",
+    });
+    setDifferentiation(draftProgress?.differentiation ?? submission?.differentiation ?? "");
+    setContinueWithoutQuestions(draftProgress?.continueWithoutQuestions ?? false);
+    setCreated({ idea, versionId: detail.versionId });
+    setResumeDraftError(null);
+    setAppliedRunId(null);
+    setResumeNeedsStepInference(!draftProgress && !detail.pendingSubmission);
+    const persistedDetails = {
       problem: idea.problem ?? "",
       solution: idea.solution ?? "",
       benefits: idea.benefits ?? "",
       risks: idea.risks ?? "",
-    });
-    setBuildsOnId(idea.buildsOnId ?? undefined);
-    if (submission) {
-      setQuestionAnswers(submission.answers);
-      setImpact({
-        turnaround: String(submission.metrics.turnaround),
-        volume: String(submission.metrics.volume),
-        value: String(submission.metrics.value),
-      });
-      setMetricExplanations({
-        turnaround: submission.metrics.turnaroundExplanation ?? "",
-        volume: submission.metrics.volumeExplanation ?? "",
-        value: submission.metrics.valueExplanation ?? "",
-      });
-      setDifferentiation(submission.differentiation ?? "");
-    }
-    setCreated({ idea, versionId: detail.versionId });
-    setResumeDraftError(null);
-    setAppliedRunId(null);
+    };
+    // Validation belongs to the saved idea version. Keep the editable working
+    // copy separate so unsaved restored edits cannot make an old result look current.
     const restoredContent = JSON.stringify({
       kind: idea.kind,
-      raw: idea.summary,
+      raw: restoredRaw,
       title: idea.title,
       summary: idea.summary,
-      details: {
-        problem: idea.problem ?? "",
-        solution: idea.solution ?? "",
-        benefits: idea.benefits ?? "",
-        risks: idea.risks ?? "",
-      },
+      details: persistedDetails,
     });
     validationSnapshot.current = restoredContent;
     setValidatedContent(restoredContent);
@@ -877,25 +892,20 @@ export function EmployeeIdeaSubmissionPage({
       setSubmitForHumanReview(false);
       setSubmitError(null);
       setSubmitResult(null);
-      dispatch(setIdeaWizardStep(2));
+      dispatch(setIdeaWizardStep(draftProgress?.step ?? 2));
     }
   }, [dispatch, resumeDraftId, resumeDraftQuery.data]);
 
   useEffect(() => {
-    if (!enrichment || !enrichmentRun || appliedRunId === enrichmentRun.id)
-      return;
-    const firstEnrichment = appliedRunId === null;
-    setTitle((current) => firstEnrichment ? enrichment.suggestedTitle : current.trim() ? current : enrichment.suggestedTitle);
-    setSummary((current) => firstEnrichment ? enrichment.conciseSummary : current.trim() ? current : enrichment.conciseSummary);
-    setDetails((current) => ({
-      ...current,
-      problem: firstEnrichment || !current.problem.trim() ? enrichment.problemStatement : current.problem,
-      benefits: firstEnrichment || !current.benefits.trim() ? enrichment.valueStatement : current.benefits,
-      solution: firstEnrichment || !current.solution.trim() ? (enrichment.solutionStatement ?? current.solution) : current.solution,
-      risks: firstEnrichment || !current.risks.trim() ? (enrichment.riskStatement ?? current.risks) : current.risks,
-    }));
-    setAppliedRunId(enrichmentRun.id);
-  }, [appliedRunId, enrichment, enrichmentRun]);
+    if (!resumeNeedsStepInference || !created || !developmentQuery.data) return;
+    const runs = developmentQuery.data.runs.filter((run) => run.ideaVersionId === created.versionId);
+    const hasValidation = runs.some((run) => run.jobKey === "idea.validate" && run.completed);
+    const hasQuestions = runs.some((run) => run.jobKey === "idea.questions" && run.completed);
+    const hasEnrichment = runs.some((run) => run.jobKey === "idea.enrich" && run.completed);
+    const inferredStep = resumeHadSubmissionRef.current ? 5 : hasValidation ? 4 : hasQuestions ? 3 : hasEnrichment ? 2 : 2;
+    dispatch(setIdeaWizardStep(inferredStep));
+    setResumeNeedsStepInference(false);
+  }, [created, developmentQuery.data, dispatch, resumeNeedsStepInference]);
   useEffect(() => {
     if (
       validationRun?.completed &&
@@ -945,18 +955,43 @@ export function EmployeeIdeaSubmissionPage({
       setQuestionError("AI could not prepare questions for this draft. Retry, or continue without AI-generated questions.");
     }
   }, [currentRuns, dispatch, pendingQuestions, questionVersionId]);
-  const applyEnrichment = () => {
+  const applyEnrichment = async () => {
     if (!enrichment || !enrichmentRun) return;
-    setTitle(enrichment.suggestedTitle);
-    setSummary(enrichment.conciseSummary);
-    setDetails((current) => ({
-      ...current,
+    const nextTitle = enrichment.suggestedTitle;
+    const nextSummary = enrichment.conciseSummary;
+    const nextDetails = {
+      ...details,
       problem: enrichment.problemStatement,
       benefits: enrichment.valueStatement,
-      solution: enrichment.solutionStatement ?? current.solution,
-      risks: enrichment.riskStatement ?? current.risks,
-    }));
-    setAppliedRunId(enrichmentRun.id);
+      solution: enrichment.solutionStatement ?? details.solution,
+      risks: enrichment.riskStatement ?? details.risks,
+    };
+    setDevelopmentError(null);
+    try {
+      if (created) {
+        const updated = await draftMutation.mutateAsync({
+          id: created.idea.id,
+          input: {
+            kind,
+            title: nextTitle.trim(),
+            summary: nextSummary.trim(),
+            category: "Customer",
+            problem: nextDetails.problem.trim() || null,
+            solution: nextDetails.solution.trim() || null,
+            benefits: nextDetails.benefits.trim() || null,
+            risks: nextDetails.risks.trim() || null,
+            dataClassification: "internal",
+          },
+        });
+        setCreated({ idea: updated.idea, versionId: updated.versionId });
+      }
+      setTitle(nextTitle);
+      setSummary(nextSummary);
+      setDetails(nextDetails);
+      setAppliedRunId(enrichmentRun.id);
+    } catch (error) {
+      setDevelopmentError(`AI suggestions were not applied because the new draft version could not be saved: ${errorMessage(error)}`);
+    }
   };
 
   const draftInput = (): IdeaCreateInput => ({
@@ -1000,6 +1035,61 @@ export function EmployeeIdeaSubmissionPage({
     setCreated(result);
     return result;
   };
+  const makeDraftProgress = (stepOverride?: number): IdeaDraftProgress => ({
+    step: stepOverride ?? step,
+    raw,
+    answers: questionAnswers,
+    impact,
+    metricExplanations,
+    differentiation,
+    continueWithoutQuestions,
+    workingCopy: {
+      kind,
+      title,
+      summary,
+      details: {
+        problem: details.problem ?? "",
+        solution: details.solution ?? "",
+        benefits: details.benefits ?? "",
+        risks: details.risks ?? "",
+      },
+    },
+  });
+  const drainDraftProgressQueue = (): Promise<void> => {
+    if (draftProgressWorkerRef.current) return draftProgressWorkerRef.current;
+    const worker = (async () => {
+      let firstError: unknown = null;
+      while (draftProgressQueueRef.current) {
+        const queued = draftProgressQueueRef.current;
+        draftProgressQueueRef.current = null;
+        try {
+          await draftProgressMutation.mutateAsync(queued);
+          setDraftProgressError(null);
+        } catch (error) {
+          setDraftProgressError(errorMessage(error));
+          firstError ??= error;
+        }
+      }
+      if (firstError) throw firstError;
+    })();
+    draftProgressWorkerRef.current = worker.finally(() => {
+      draftProgressWorkerRef.current = null;
+      if (draftProgressQueueRef.current) void drainDraftProgressQueue();
+    });
+    return draftProgressWorkerRef.current;
+  };
+  const persistDraftProgress = (stepOverride?: number): Promise<void> => {
+    if (!created || created.idea.status !== "draft" || submitResult?.submitted) return Promise.resolve();
+    draftProgressQueueRef.current = { id: created.idea.id, progress: makeDraftProgress(stepOverride) };
+    return drainDraftProgressQueue();
+  };
+
+  useEffect(() => {
+    if (!created || created.idea.status !== "draft" || submitResult?.submitted) return;
+    const timer = setTimeout(() => { void persistDraftProgress().catch(() => undefined); }, 350);
+    return () => clearTimeout(timer);
+  }, [created, step, raw, questionAnswers, impact, metricExplanations, differentiation, continueWithoutQuestions, kind, title, summary, details, submitResult]);
+
   const requestDevelopment = async (action: "enrich" | "questions" | "validate") => {
     if (aiRequestLock.current || title.trim().length < 3 || summary.trim().length < 10) return null;
     aiRequestLock.current = true;
@@ -1189,8 +1279,22 @@ export function EmployeeIdeaSubmissionPage({
 
   const checkPassOrFail = async () => {
     if (!requiredQuestionsAnswered || aiRequestLock.current || validationInProgress) return;
+    try {
+      await persistDraftProgress(4);
+    } catch {
+      setDevelopmentError("Your draft progress could not be saved. Check your connection and try again before continuing.");
+      return;
+    }
     dispatch(setIdeaWizardStep(4));
     await requestDevelopment("validate");
+  };
+  const moveToStep = async (nextStep: number) => {
+    try {
+      await persistDraftProgress(nextStep);
+      dispatch(setIdeaWizardStep(nextStep));
+    } catch {
+      setDraftProgressError("Your draft progress could not be saved. Check your connection and try again.");
+    }
   };
   if (created && submitResult) {
     const completed = Boolean(submitResult?.submitted);
@@ -1360,6 +1464,14 @@ export function EmployeeIdeaSubmissionPage({
         </div>
       </section>}
       <IdeaStepBar step={step} />
+      {draftProgressError ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#d6336c]/35 bg-[#d6336c]/[.04] px-3 py-2 text-xs text-[#b4235b]" role="alert">
+          <span>Draft progress could not be saved: {draftProgressError}</span>
+          <button className="font-semibold underline underline-offset-2" type="button" onClick={() => void persistDraftProgress().catch(() => undefined)}>Retry save</button>
+        </div>
+      ) : draftProgressMutation.isPending && created?.idea.status === "draft" ? (
+        <p className="text-right text-xs text-muted" role="status">Saving draft progress…</p>
+      ) : null}
       {step === 2 && (
         <div className="flex flex-wrap items-start gap-2 rounded-xl border px-4 py-[11px] text-[13px]" style={{ borderColor: "var(--line)" }} role="status">
           <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-[#0e9f7a]" />
@@ -1436,7 +1548,14 @@ export function EmployeeIdeaSubmissionPage({
             ))}
           </div>
           {enrichmentRun?.failed && <p className="mt-3 text-sm text-[#d6336c]" role="alert">Suggestions could not be completed. Complete the structure manually or try again.</p>}
-          {enrichment && appliedRunId !== enrichmentRun?.id && <div className="mt-3"><p className="text-sm text-muted">AI improvements are ready. Applying them will replace the current wording; all fields remain editable.</p><button className="btn mt-2" onClick={applyEnrichment}>Apply AI improvements</button></div>}
+          {enrichment && appliedRunId !== enrichmentRun?.id && <div className="mt-4 rounded-xl border p-4" style={{ borderColor: "var(--line)" }}>
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">AI suggestions · review before applying</h3><p className="mt-1 text-sm text-muted">Review the proposed wording. Applying saves it as a new draft version; you can still edit every field afterward.</p></div><button className="btn-primary shrink-0" type="button" disabled={draftMutation.isPending} onClick={() => void applyEnrichment()}>{draftMutation.isPending ? "Saving new version…" : "Apply suggestions"}</button></div>
+            <dl className="mt-3 grid gap-2 sm:grid-cols-2">{[
+              ["Title", enrichment.suggestedTitle], ["Summary", enrichment.conciseSummary],
+              ["Problem", enrichment.problemStatement], ["Solution", enrichment.solutionStatement],
+              ["Benefits", enrichment.valueStatement], ["Risks", enrichment.riskStatement],
+            ].filter(([, value]) => typeof value === "string" && value.trim()).map(([label, value]) => <div key={label} className="rounded-lg bg-[var(--hover)] p-3"><dt className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</dt><dd className="mt-1 whitespace-pre-wrap text-sm">{value}</dd></div>)}</dl>
+          </div>}
           {developmentQuery.isError && (
             <p className="mt-3 text-sm text-[#d6336c]" role="alert">
               {errorMessage(developmentQuery.error)}{" "}
@@ -1454,7 +1573,7 @@ export function EmployeeIdeaSubmissionPage({
             </p>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
-            <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(1))}>Back to describe</button>
+            <button className="btn" type="button" onClick={() => void moveToStep(1)}>Back to describe</button>
             <button className="btn-primary" type="button" disabled={title.trim().length < 3 || summary.trim().length < 10 || aiAction !== null || activeRunInProgress || developmentMutation.isPending || pendingQuestions || questionsRun?.pending} onClick={() => void prepareReviewerQuestions()}>
               {questionsInProgress ? "Preparing questions…" : "Generate idea-specific questions"}
             </button>
@@ -1522,7 +1641,7 @@ export function EmployeeIdeaSubmissionPage({
             </div>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
-            <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(2))}>Back</button>
+            <button className="btn" type="button" onClick={() => void moveToStep(2)}>Back</button>
             <button className="btn-primary" type="button" disabled={!requiredQuestionsAnswered || aiRequestLock.current || aiAction !== null || validationInProgress || developmentMutation.isPending} onClick={() => void checkPassOrFail()}>{validationInProgress || aiAction === "validate" ? "Checking with AI…" : <><Icon name="shield" className="mr-2 inline h-4 w-4" />Check: pass or fail</>}</button>
           </div>
         </section>
@@ -1626,14 +1745,14 @@ export function EmployeeIdeaSubmissionPage({
           )}
           <div className="mt-5 flex flex-wrap items-center gap-2">
             {validation && !validationPassed && <>
-              <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(2))}>Edit draft</button>
+              <button className="btn" type="button" onClick={() => void moveToStep(2)}>Edit draft</button>
               <button className="btn" type="button" disabled={aiAction !== null || activeRunInProgress || developmentMutation.isPending} onClick={() => { dispatch(setIdeaWizardStep(2)); void requestDevelopment("enrich"); }}>{aiAction === "enrich" || enrichmentInProgress ? "Improving with AI…" : "Improve with AI"}</button>
               <button className="btn-primary" type="button" disabled={aiAction !== null || activeRunInProgress || developmentMutation.isPending || title.trim().length < 3 || summary.trim().length < 10} onClick={() => void requestDevelopment("validate")}>{aiAction === "validate" || validationInProgress ? "Checking with AI…" : "Check with AI again"}</button>
             </>}
             {canSubmitForHumanReview
-              ? <button className="btn-primary" type="button" onClick={() => dispatch(setIdeaWizardStep(5))}>Continue to human review</button>
+              ? <button className="btn-primary" type="button" onClick={() => void moveToStep(5)}>Continue to human review</button>
               : validationPassed
-                ? <button className="btn-primary" type="button" disabled={!validationIsCurrent} onClick={() => dispatch(setIdeaWizardStep(5))}>Continue to the numbers</button>
+                ? <button className="btn-primary" type="button" disabled={!validationIsCurrent} onClick={() => void moveToStep(5)}>Continue to the numbers</button>
                 : null}
           </div>
         </section>
@@ -1661,7 +1780,7 @@ export function EmployeeIdeaSubmissionPage({
           {priorityResult && <div className="mt-4 rounded-xl border p-4 text-sm" style={{ borderColor: "var(--line)" }} aria-live="polite"><p className="font-medium">Live priority score: {priorityResult.score.toFixed(2)} / 3 · {priorityResult.band}</p><p className="mt-1 text-muted">Minimum to submit: {priorityPolicyQuery.data!.minimumScore.toFixed(2)}</p><div className="mt-2 space-y-1">{priorityResult.breakdown.map((item) => <p key={item.key} className="flex justify-between gap-3"><span className="capitalize">{item.key} · {Math.round(item.weight * 100)}%</span><span>{item.score.toFixed(1)} → {item.contribution.toFixed(2)}</span></p>)}</div>{priorityResult.score < priorityPolicyQuery.data!.minimumScore && <p className="mt-2 text-[#d6336c]" role="alert">Increase the impact scores or improve the estimates to meet the submission minimum.</p>}</div>}
           {Boolean(submissionError) && <div className="mt-4 rounded-xl border border-[#d6336c]/40 p-4 text-sm" role="alert"><p className="font-medium text-[#d6336c]">{errorMessage(submissionError)}</p>{submissionRejection && priorityScoreRejected && <p className="mt-1">Server score / minimum: {submissionRejection.score?.toFixed(2) ?? "—"} / {submissionRejection.minimumScore?.toFixed(2) ?? "—"}{submissionRejection.priorityBand ? ` · ${submissionRejection.priorityBand}` : ""}</p>}{submissionRejection?.breakdown.map((item) => <p className="mt-1 flex justify-between gap-3" key={item.key}><span className="capitalize">{item.key} · {Math.round(item.weight * 100)}%</span><span>{item.score.toFixed(1)} → {item.contribution.toFixed(2)}</span></p>)}{priorityScoreRejected && <p className="mt-2 text-muted">Adjust the impact numbers to meet the server minimum, then submit again.</p>}</div>}
           <div className="mt-4 flex flex-wrap gap-2">
-            <button className="btn" type="button" onClick={() => dispatch(setIdeaWizardStep(4))}>Back to validation</button>
+            <button className="btn" type="button" onClick={() => void moveToStep(4)}>Back to validation</button>
             <button className="btn-primary" type="button" disabled={!fieldsValid || busy || submitRequestLock.current || validationBlocked || !priorityResult || priorityResult.score < priorityPolicyQuery.data!.minimumScore} onClick={() => void submit(canSubmitForHumanReview && !validationPassed)}>{busy ? "Submitting…" : canSubmitForHumanReview && !validationPassed ? "Submit for human review" : "Submit idea"}</button>
           </div>
           {busy && <WizardProgressPanel title="Submitting your idea" detail={saveSubmissionMutation.isPending ? "Saving your answers and impact estimates." : "Registering your idea and finalizing its submission."} />}
@@ -1849,19 +1968,19 @@ const lifecycle = [
 export function EmployeeIdeaDetailPage({
   ideaId,
   onBack,
+  onResumeDraft,
 }: {
   ideaId: number;
   onBack: () => void;
+  onResumeDraft?: (id: number) => void;
 }) {
-  const profileQuery = useEmployeeProfile();
   const detailQuery = useIdea(ideaId);
-  const commentsQuery = useIdeaComments(ideaId, {}, Boolean(detailQuery.data?.idea && detailQuery.data.idea.status !== "draft"));
-  const supportMutation = useSupportIdea();
-  const commentMutation = useAddIdeaComment();
   const updateMutation = useUpdateIdea();
   const submitMutation = useSubmitIdea();
-  const [comment, setComment] = useState("");
   const [editing, setEditing] = useState(false);
+  const [resubmissionVersionId, setResubmissionVersionId] = useState<number | null>(null);
+  const [resubmissionMessage, setResubmissionMessage] = useState<string | null>(null);
+  const resubmissionRequestLock = useRef(false);
   const [edit, setEdit] = useState({
     title: "",
     summary: "",
@@ -1871,11 +1990,13 @@ export function EmployeeIdeaDetailPage({
     risks: "",
   });
   const idea = detailQuery.data?.idea;
-  const canSupportIdea = Boolean(idea && profileQuery.data && idea.authorId !== profileQuery.data.id);
+  const submissionReadinessQuery = useIdeaSubmissionReadiness(
+    ideaId,
+    resubmissionVersionId !== null,
+    resubmissionVersionId ?? undefined,
+  );
   const author = idea ? ideaAuthor(idea) : { name: "Contributor", department: undefined };
   const activeStage = idea ? ({ draft: -1, screening: 0, returned: 0, business_review: 1, control_review: 2, decision: 3, poc: 4, implementation: 5, implemented: 6, rejected: -1, deferred: -1 }[idea.status]) : -1;
-  const comments =
-    commentsQuery.data?.items ?? detailQuery.data?.comments.items ?? [];
   const startEdit = () => {
     if (!idea) return;
     setEdit({
@@ -1891,6 +2012,8 @@ export function EmployeeIdeaDetailPage({
   const saveAndResubmit = async () => {
     if (!idea) return;
     try {
+      setResubmissionMessage(null);
+      submitMutation.reset();
       const result = await updateMutation.mutateAsync({
         id: idea.id,
         input: edit,
@@ -1898,15 +2021,53 @@ export function EmployeeIdeaDetailPage({
       const versionId = Number(
         (result.version as { id?: number } | undefined)?.id,
       );
-      await submitMutation.mutateAsync({
+      if (!Number.isInteger(versionId) || versionId < 1) {
+        throw new Error("The updated idea version could not be identified. Please try saving again.");
+      }
+      const submission = await submitMutation.mutateAsync({
         id: idea.id,
-        versionId: Number.isInteger(versionId) ? versionId : undefined,
+        versionId,
       });
-      setEditing(false);
+      if (submission.submitted) {
+        setEditing(false);
+      } else {
+        setResubmissionVersionId(submission.versionId ?? versionId);
+        setResubmissionMessage("Your changes are saved. We’re checking the updated idea before sending it back for review.");
+      }
     } catch {
       /* mutation errors are shown in the editor */
     }
   };
+  useEffect(() => {
+    if (resubmissionVersionId === null || resubmissionRequestLock.current) return;
+    if (submissionReadinessQuery.data?.needsAttention) {
+      setResubmissionMessage("The updated idea could not finish its automated check. Your changes are saved; edit and save again to retry with a new version.");
+      setResubmissionVersionId(null);
+      return;
+    }
+    if (!submissionReadinessQuery.data?.canFinalize) return;
+    resubmissionRequestLock.current = true;
+    submitMutation.mutate(
+      { id: ideaId, versionId: resubmissionVersionId },
+      {
+        onSuccess: (submission) => {
+          if (submission.submitted) {
+            setEditing(false);
+            setResubmissionMessage("Your idea has been resubmitted for review.");
+          } else {
+            setResubmissionMessage("The updated idea is still being checked. Please wait while the check completes.");
+          }
+          setResubmissionVersionId(null);
+          resubmissionRequestLock.current = false;
+        },
+        onError: (error) => {
+          setResubmissionMessage(errorMessage(error));
+          setResubmissionVersionId(null);
+          resubmissionRequestLock.current = false;
+        },
+      },
+    );
+  }, [ideaId, resubmissionVersionId, submissionReadinessQuery.data, submitMutation]);
   if (detailQuery.isPending)
     return (
       <StateMessage
@@ -2023,11 +2184,13 @@ export function EmployeeIdeaDetailPage({
               </button>
               <button
                 className="btn-primary"
-                disabled={updateMutation.isPending || submitMutation.isPending}
+                disabled={updateMutation.isPending || submitMutation.isPending || resubmissionVersionId !== null}
                 onClick={() => void saveAndResubmit()}
               >
-                {updateMutation.isPending || submitMutation.isPending
-                  ? "Resubmitting…"
+                {resubmissionVersionId !== null
+                  ? "Checking updated idea…"
+                  : updateMutation.isPending || submitMutation.isPending
+                    ? "Resubmitting…"
                   : "Save and resubmit"}
               </button>
             </div>
@@ -2042,7 +2205,7 @@ export function EmployeeIdeaDetailPage({
               <div>
                 <b className="font-medium">Registered to {author.name}{author.department ? `, ${author.department}` : ""}</b>
                 <p className="text-muted">
-                  {idea.status === "draft" ? `Draft ${idea.reference} is visible only to you.` : `Record ${idea.reference}. Supporters and commenters are credited by name.`}
+                  {idea.status === "draft" ? `Draft ${idea.reference} is visible only to you.` : `Record ${idea.reference}.`}
                 </p>
               </div>
             </div>
@@ -2060,100 +2223,18 @@ export function EmployeeIdeaDetailPage({
                 </div>
               ))}
             </div>
-            {idea.status === "draft" && <p className="mt-4 text-sm text-muted">This draft is private until AI validation and final submission finish.</p>}
+            {idea.status === "draft" && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3" style={{ borderColor: "var(--line)" }}><p className="text-sm text-muted">This draft is private until AI validation and final submission finish.</p>{onResumeDraft && <button className="btn-primary" type="button" onClick={() => onResumeDraft(idea.id)}>Resume draft</button>}</div>}
             <div className="mt-4 flex flex-wrap gap-2">
-              {idea.status !== "draft" && canSupportIdea &&
-              <button
-                className="btn-primary"
-                disabled={supportMutation.isPending}
-                onClick={() => supportMutation.mutate(idea.id)}
-              >
-                <Icon name="up" />{" "}
-                {supportMutation.isPending
-                  ? "Supporting…"
-                  : `${idea.supports} Support this idea`}
-              </button>}
-              {idea.status !== "draft" && profileQuery.data?.id === idea.authorId && (
-                <p className="self-center text-sm text-muted">You can support colleagues’ ideas, but not your own.</p>
-              )}
               {idea.status === "returned" && (
                 <button className="btn" onClick={startEdit}>
-                  Edit and resubmit
+                  Edit returned idea
                 </button>
               )}
             </div>
-            {supportMutation.isError && (
-              <p className="mt-3 text-sm text-[#d6336c]" role="alert">
-                {errorMessage(supportMutation.error)}
-              </p>
-            )}
           </>
         )}
       </section>
-      {idea.status !== "draft" && <section className="app-card">
-        <h2 className="text-xl font-medium">
-          Discussion{" "}
-          <span className="font-normal text-muted">
-            ({commentsQuery.isPending ? "…" : comments.length})
-          </span>
-        </h2>
-        {commentsQuery.isError ? (
-          <p className="mt-2 text-sm text-[#d6336c]" role="alert">
-            {errorMessage(commentsQuery.error)}
-          </p>
-        ) : comments.length === 0 ? (
-          <p className="mt-2 text-sm text-muted">
-            No comments yet. Be the first.
-          </p>
-        ) : (
-          <div className="mt-4 space-y-3">
-            {comments.map((item) => (
-              <div
-                className="rounded-xl border p-3"
-                key={item.id}
-                style={{ borderColor: "var(--line)" }}
-              >
-                <div className="flex items-center gap-2 text-sm">
-                  <Avatar name={item.author?.name ?? "Member"} />
-                  <b className="font-medium">
-                    {item.author?.name ?? "Community member"}
-                  </b>
-                  <span className="text-xs text-muted">
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-muted">{item.body}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="mt-4 flex items-end gap-2">
-          <textarea
-            className="input min-h-[76px]"
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-            aria-label="Add a comment or a suggestion"
-            placeholder="Add a comment or a suggestion"
-          />
-          <button
-            className="btn-primary"
-            disabled={!comment.trim() || commentMutation.isPending}
-            onClick={() => {
-              void commentMutation
-                .mutateAsync({ id: idea.id, body: comment.trim() })
-                .then(() => setComment(""))
-                .catch(() => undefined);
-            }}
-          >
-            {commentMutation.isPending ? "Posting…" : "Post"}
-          </button>
-        </div>
-        {commentMutation.isError && (
-          <p className="mt-2 text-sm text-[#d6336c]" role="alert">
-            {errorMessage(commentMutation.error)}
-          </p>
-        )}
-      </section>}
+      {resubmissionMessage && <p className="app-card text-sm text-muted" role="status">{resubmissionMessage}</p>}
     </div>
   );
 }

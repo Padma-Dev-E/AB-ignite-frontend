@@ -1,8 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { addIdeaComment, createIdea, deleteIdeaDraft, getIdea, getIdeaDevelopment, getIdeaPriorityPolicy, getIdeaSubmissionReadiness, ideaQueryKeys, listIdeaComments, listIdeas, queueIdeaDevelopment, saveIdeaSubmission, submitIdea, supportIdea, updateIdea, updateIdeaDraft } from "./api";
-import type { IdeaCreateInput, IdeaListParams, IdeaSubmissionInput, IdeaUpdateInput } from "./types";
+import { addIdeaComment, createIdea, deleteIdeaDraft, getIdea, getIdeaDevelopment, getIdeaPriorityPolicy, getIdeaSubmissionReadiness, ideaQueryKeys, listIdeaComments, listIdeas, queueIdeaDevelopment, saveIdeaDraftProgress, saveIdeaSubmission, submitIdea, supportIdea, updateIdea, updateIdeaDraft } from "./api";
+import type { IdeaCreateInput, IdeaDraftProgress, IdeaListParams, IdeaSubmissionInput, IdeaUpdateInput } from "./types";
 
 export function useIdeas(params: IdeaListParams = {}, enabled = true) { return useQuery({ queryKey: ideaQueryKeys.list(params), queryFn: () => listIdeas(params), enabled }); }
 export function useIdeaPriorityPolicy() { return useQuery({ queryKey: ["ideas", "priority-policy"] as const, queryFn: getIdeaPriorityPolicy, staleTime: 60_000 }); }
@@ -21,6 +21,9 @@ export function useSaveIdeaSubmission() {
   const client = useQueryClient();
   return useMutation({ mutationFn: ({ id, input }: { id: number; input: IdeaSubmissionInput }) => saveIdeaSubmission(id, input), onSuccess: (_data, variables) => { void client.invalidateQueries({ queryKey: ideaQueryKeys.detail(variables.id) }); } });
 }
+export function useSaveIdeaDraftProgress() {
+  return useMutation({ mutationFn: ({ id, progress }: { id: number; progress: IdeaDraftProgress }) => saveIdeaDraftProgress(id, progress) });
+}
 export function useIdea(id: number, enabled = true) { return useQuery({ queryKey: ideaQueryKeys.detail(id), queryFn: () => getIdea(id), enabled: enabled && id > 0 }); }
 export function useDeleteIdeaDraft() {
   const client = useQueryClient();
@@ -31,7 +34,7 @@ export function useDeleteIdeaDraft() {
     client.removeQueries({ queryKey: ["ideas", "submission-readiness", id] });
   } });
 }
-export function useIdeaSubmissionReadiness(id: number, enabled = true) { return useQuery({ queryKey: ["ideas", "submission-readiness", id] as const, queryFn: () => getIdeaSubmissionReadiness(id), enabled: enabled && id > 0, refetchInterval: (query) => { const readiness = query.state.data; return readiness?.canFinalize || readiness?.needsAttention ? false : 2000; } }); }
+export function useIdeaSubmissionReadiness(id: number, enabled = true, versionId?: number) { return useQuery({ queryKey: ["ideas", "submission-readiness", id, versionId ?? null] as const, queryFn: () => getIdeaSubmissionReadiness(id), enabled: enabled && id > 0, refetchInterval: (query) => { const readiness = query.state.data; return readiness?.canFinalize || readiness?.needsAttention ? false : 2000; } }); }
 export function useIdeaDevelopment(id: number, enabled = true, activeRunId?: number | null) { return useQuery({ queryKey: ["ideas", "development", id] as const, queryFn: () => getIdeaDevelopment(id), enabled: enabled && id > 0, refetchInterval: (query) => {
   const runs = query.state.data?.runs ?? [];
   if (activeRunId != null) {
